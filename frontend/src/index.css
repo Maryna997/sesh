@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+/*
+  Sesh design tokens, taken from the Figma "Brand & Design System" page.
+  Each color becomes a Tailwind utility, e.g. --color-ink -> text-ink, bg-ink.
+*/
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Core palette */
+  --color-blue: #167dad;
+  --color-ink: #17364b;
+  --color-muted: #647d8c;
+  --color-pale: #e1f2f6;
+  --color-bg: #f7fbfc;
+  --color-line: #d9e7eb;
+  --color-green: #d8f4e8;
+
+  /* Navigation menu */
+  --color-teal: #126b75;
+  --color-menu: #f9fcfc;
+  --color-menu-active: #e0f2f5;
+  --color-menu-ink: #17384a;
+  --color-logout: #704d52;
+  --color-logout-bg: #f6fafb;
+  --color-overlay: rgb(13 38 46 / 0.38);
+}
+
+body {
+  @apply bg-bg font-sans text-ink antialiased;
+}

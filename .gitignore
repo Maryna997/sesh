@@ -1,0 +1,30 @@
+# Local project instructions
+CLAUDE.md
+
+# Dependencies
+node_modules/
+
+# Environment variables (keep the examples)
+.env
+.env.*
+!.env.example
+
+# Build and test output
+dist/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~

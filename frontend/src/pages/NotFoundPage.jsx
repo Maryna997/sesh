@@ -1,5 +1,6 @@
-import { Link } from 'react-router'
+import { ArrowRight } from 'lucide-react'
 import PageIntro from '../components/PageIntro'
+import Button from '../components/ui/Button'
 
 // Fallback for any URL that doesn't match a route.
 function NotFoundPage() {
@@ -9,12 +10,9 @@ function NotFoundPage() {
       title="Page not found"
       description="This page drifted out with the tide."
     >
-      <Link
-        to="/discover"
-        className="mt-8 inline-block text-sm font-bold text-blue hover:text-ink focus-visible:outline-2 focus-visible:outline-blue"
-      >
-        Go to Discover →
-      </Link>
+      <Button to="/discover" variant="text" className="mt-6 -ml-4">
+        Go to Discover <ArrowRight size={16} aria-hidden="true" />
+      </Button>
     </PageIntro>
   )
 }

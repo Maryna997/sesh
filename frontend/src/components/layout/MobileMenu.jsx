@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router'
 import { LogOut, X } from 'lucide-react'
 import { menuNavItems } from '../../config/navigation'
+import { trapTabKey } from '../../utils/trapFocus'
 
 export const MOBILE_MENU_ID = 'mobile-menu'
 
@@ -25,19 +26,7 @@ function MobileMenu({ onClose }) {
         return
       }
 
-      if (event.key !== 'Tab') return
-
-      const focusable = panelRef.current.querySelectorAll('a[href], button:not([disabled])')
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
+      trapTabKey(event, panelRef.current)
     }
 
     document.addEventListener('keydown', handleKeyDown)

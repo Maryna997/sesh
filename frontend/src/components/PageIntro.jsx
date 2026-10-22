@@ -3,7 +3,7 @@
 function PageIntro({ eyebrow = 'SESH  /  SURF COMMUNITY', title, description, children }) {
   return (
     <section className="max-w-[620px]">
-      <p className="text-xs font-bold whitespace-pre-wrap text-blue">{eyebrow}</p>
+      <p className="text-xs font-bold whitespace-pre-wrap text-link">{eyebrow}</p>
       <h1 className="mt-6 text-[28px] font-bold text-ink md:text-[30px] lg:mt-8 lg:text-4xl">
         {title}
       </h1>

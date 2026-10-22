@@ -10,11 +10,31 @@
   /* Core palette */
   --color-blue: #167dad;
   --color-ink: #17364b;
-  --color-muted: #647d8c;
+
+  /*
+    Text colors, adjusted for WCAG AA (at least 4.5:1 for normal text).
+    - muted: secondary text. Figma uses #647d8c, which is only ~3.9-4.3:1
+      on white and on the pale card background; this slightly darker shade
+      keeps the same blue-grey tone.
+    - link: blue for small text (links, eyebrows, spot names). The brand
+      blue (#167dad) stays for buttons, badges and focus rings, where it passes.
+  */
+  --color-muted: #586e7b;
+  --color-link: #15719c;
   --color-pale: #e1f2f6;
   --color-bg: #f7fbfc;
   --color-line: #d9e7eb;
   --color-green: #d8f4e8;
+
+  /* Surfaces and form fields (Discover, Status, Login frames) */
+  --color-card: #ebf6f8;
+  --color-border: #c9e0e5;
+
+  /* Destructive actions (Settings / Delete Account frame) */
+  --color-danger: #b84542;
+  --color-danger-soft: #fcf2f0;
+  --color-danger-line: #e5c9c2;
+  --color-danger-ink: #8f4a40;
 
   /* Navigation menu */
   --color-teal: #126b75;

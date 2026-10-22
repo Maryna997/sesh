@@ -15,7 +15,7 @@ function TopNav() {
               className={({ isActive }) =>
                 [
                   'block rounded-md px-1 py-2 text-ink underline-offset-8 transition-colors',
-                  'hover:text-blue focus-visible:outline-2 focus-visible:outline-blue',
+                  'hover:text-link focus-visible:outline-2 focus-visible:outline-blue',
                   isActive ? 'font-bold underline decoration-blue decoration-2' : 'font-normal',
                 ].join(' ')
               }

@@ -7,22 +7,28 @@ import { LoaderCircle } from 'lucide-react'
 // - outline: white with a light border (landing "Log in" secondary CTA)
 // - text: link-style action ("Forgot password?", "Cancel and go back")
 // - danger: destructive action ("Permanently delete account")
+// - accent: teal call-to-action on the landing page ("Create account")
+// - ghost: teal text without a background (visitor header "Log in")
 const variantClasses = {
+  ghost: 'text-teal hover:bg-card',
   primary: 'bg-blue text-white hover:bg-ink',
   secondary: 'bg-pale text-ink hover:bg-border',
   outline: 'border border-border bg-white text-teal hover:bg-card',
   text: 'text-link underline-offset-4 hover:underline',
   danger: 'bg-danger text-white hover:bg-danger-ink',
+  accent: 'bg-teal text-white hover:bg-ink',
 }
 
-// Heights match the Figma buttons: 42px (default) and 47px (form CTAs).
+// Heights match the Figma buttons: 42px (default), 47px (form CTAs)
+// and 54px with a 12px radius (landing page CTAs).
 const sizeClasses = {
-  sm: 'h-9 px-3.5 text-xs',
-  md: 'h-[42px] px-4 text-[13px]',
-  lg: 'h-[47px] px-5 text-sm',
+  sm: 'h-9 rounded-[10px] px-3.5 text-xs',
+  md: 'h-[42px] rounded-[10px] px-4 text-[13px]',
+  lg: 'h-[47px] rounded-[10px] px-5 text-sm',
+  xl: 'h-[54px] rounded-xl px-6 text-[15px]',
 }
 
-const iconSizes = { sm: 14, md: 16, lg: 18 }
+const iconSizes = { sm: 14, md: 16, lg: 18, xl: 18 }
 
 // One button component for actions and links.
 // - Pass `to` for an in-app route (React Router Link) or `href` for an external link.
@@ -45,7 +51,7 @@ function Button({
   const isDisabled = disabled || loading
 
   const classes = [
-    'inline-flex items-center justify-center gap-2 rounded-[10px] font-bold transition-colors',
+    'inline-flex items-center justify-center gap-2 font-bold transition-colors',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'aria-disabled:cursor-not-allowed aria-disabled:opacity-50',

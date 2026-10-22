@@ -36,8 +36,10 @@
   --color-danger-line: #e5c9c2;
   --color-danger-ink: #8f4a40;
 
-  /* Navigation menu */
-  --color-teal: #126b75;
+  /* Navigation menu and landing accents.
+     teal is slightly darker than Figma's #126b75 / #0e7887 so small teal
+     text stays at least 4.5:1 over the landing hero photo. */
+  --color-teal: #0e626c;
   --color-menu: #f9fcfc;
   --color-menu-active: #e0f2f5;
   --color-menu-ink: #17384a;

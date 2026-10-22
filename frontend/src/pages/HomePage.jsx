@@ -1,25 +1,22 @@
-import PageIntro from '../components/PageIntro'
-import Button from '../components/ui/Button'
-import ApiHealthCheck from '../components/ApiHealthCheck'
+import LandingHero from '../components/landing/LandingHero'
+import HowSeshWorks from '../components/landing/HowSeshWorks'
 
-// Temporary home page. It will be replaced by the public landing page
-// in a later task; for now it keeps the API connection check visible.
+// Public landing page (/), from the Figma "Welcome / Public landing" frames.
+// It is full-width (no PageLayout padding) so the hero image can reach
+// the screen edges. The API health check moved to /dev/api-health.
 function HomePage() {
   return (
-    <PageIntro
-      eyebrow="YOUR NEXT SESSION STARTS HERE"
-      title="Find your surf people."
-      description="Good waves are better together."
-    >
-      <Button to="/discover" size="lg" className="mt-8">
-        Start discovering
-      </Button>
+    <>
+      <LandingHero />
 
-      <div className="mt-10 max-w-md">
-        <h2 className="mb-2 text-xs font-bold text-muted">Development: API connection</h2>
-        <ApiHealthCheck />
+      <div className="px-[22px] pb-8 md:px-[38px] lg:px-[72px]">
+        <HowSeshWorks className="mt-[15px] md:mt-5" />
+
+        <p className="mt-[31px] text-[10px] text-muted md:mt-[33px] md:text-xs">
+          No live GPS tracking required · You decide when you’re visible
+        </p>
       </div>
-    </PageIntro>
+    </>
   )
 }
 

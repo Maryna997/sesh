@@ -3,11 +3,17 @@ import Header from './Header'
 
 // Shared shell for every page: header on top, page content below.
 // <Outlet /> is where React Router renders the page for the current URL.
-function AppLayout() {
+// The main area has no padding of its own, so full-width pages like the
+// landing hero can reach the screen edges; regular pages get their
+// padding from PageLayout.
+//
+// `isAuthenticated` picks the header variant. It is false until real
+// authentication exists (it will then come from the signed-in user).
+function AppLayout({ isAuthenticated = false }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
-      <main className="w-full flex-1 px-[22px] py-10 md:px-7 lg:px-[72px] lg:py-16">
+      <Header isAuthenticated={isAuthenticated} />
+      <main className="w-full flex-1">
         <Outlet />
       </main>
     </div>

@@ -1,6 +1,9 @@
 # Local project instructions
 CLAUDE.md
 
+# Private capstone development documentation
+docs-private/
+
 # Dependencies
 node_modules/
 

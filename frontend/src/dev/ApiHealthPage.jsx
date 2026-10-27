@@ -8,7 +8,7 @@ function ApiHealthPage() {
     <PageIntro
       eyebrow="DEVELOPMENT ONLY"
       title="API connection"
-      description="Checks GET /api/v1/health on the backend set in VITE_API_URL."
+      description="Checks GET /api/v1/health through the /api proxy (Vite forwards it to the backend)."
     >
       <div className="mt-8 max-w-md">
         <ApiHealthCheck />

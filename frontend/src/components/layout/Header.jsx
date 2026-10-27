@@ -4,19 +4,30 @@ import Logo from './Logo'
 import TopNav from './TopNav'
 import VisitorActions from './VisitorActions'
 import MobileMenu, { MOBILE_MENU_ID } from './MobileMenu'
+import { useAuth } from '../../auth/useAuth'
+import { AUTH_STATUS } from '../../auth/authContext'
 
 // Matches Tailwind's `md` breakpoint, where the top nav replaces the burger.
 const TABLET_QUERY = '(min-width: 48rem)'
 
-// App header with two variants, chosen by the `isAuthenticated` prop:
-// - Visitor (default): logo + "Log in" and "Create account" actions.
-// - Signed-in surfer: logo + Discover / Status / Messages / My profile
-//   (top nav on tablet and desktop, burger menu on mobile).
-// Real authentication doesn't exist yet, so every page uses the visitor
-// header; the layout will pass isAuthenticated once login is built.
-function Header({ isAuthenticated = false }) {
+// App header. Its right-hand side follows the auth state:
+// - Signed in: Discover / Status / Messages / My profile (account menu with
+//   Settings & Privacy and Log out) on tablet and desktop; burger menu on mobile.
+// - Visitor: "Log in" and "Create account". The logo links to the home page.
+// - While the session is being checked: nothing, so the wrong actions never flash.
+//
+// `isAuthenticated` can force a variant (used by the dev-only header preview);
+// normally it is left out and the real auth state is used.
+function Header({ isAuthenticated: forcedAuthenticated }) {
+  const { status } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const burgerButtonRef = useRef(null)
+
+  let variant
+  if (forcedAuthenticated !== undefined) variant = forcedAuthenticated ? 'member' : 'visitor'
+  else if (status === AUTH_STATUS.AUTHENTICATED) variant = 'member'
+  else if (status === AUTH_STATUS.CHECKING) variant = 'checking'
+  else variant = 'visitor'
 
   // Closing returns keyboard focus to the burger button that opened the menu.
   const closeMenu = useCallback(() => {
@@ -44,12 +55,12 @@ function Header({ isAuthenticated = false }) {
           'flex h-[70px] items-center justify-between px-[22px] md:h-[72px] md:pr-5 md:pl-7 lg:h-20 lg:pl-12',
           // Right margin: 28px for the visitor actions (Figma), 48px for the
           // signed-in nav so it mirrors the logo's 48px left margin.
-          isAuthenticated ? 'lg:pr-12' : 'lg:pr-7',
+          variant === 'member' ? 'lg:pr-12' : 'lg:pr-7',
         ].join(' ')}
       >
         <Logo />
 
-        {isAuthenticated ? (
+        {variant === 'member' && (
           <>
             <TopNav />
             <button
@@ -64,12 +75,12 @@ function Header({ isAuthenticated = false }) {
               <Menu size={24} aria-hidden="true" />
             </button>
           </>
-        ) : (
-          <VisitorActions />
         )}
+
+        {variant === 'visitor' && <VisitorActions />}
       </div>
 
-      {isAuthenticated && isMenuOpen && <MobileMenu onClose={closeMenu} />}
+      {variant === 'member' && isMenuOpen && <MobileMenu onClose={closeMenu} />}
     </header>
   )
 }

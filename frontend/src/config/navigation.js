@@ -5,11 +5,18 @@ import { Circle, Mail, Search, Settings, User } from 'lucide-react'
 // so adding or renaming a page only needs a change in one place.
 
 // Short labels for the horizontal top navigation (tablet and desktop).
+// The fourth item, "My profile", opens the account menu below (Figma
+// "My profile / Account menu open" frames).
 export const topNavItems = [
   { to: '/discover', label: 'Discover' },
   { to: '/status', label: 'Status' },
   { to: '/messages', label: 'Messages' },
-  { to: '/profile', label: 'My profile' },
+]
+
+// Links in the tablet/desktop account menu (followed by "Log out")
+export const accountMenuItems = [
+  { to: '/profile', label: 'My Profile' },
+  { to: '/settings', label: 'Settings & Privacy' },
 ]
 
 // Fuller list for the mobile burger menu. Icons are lucide-react components

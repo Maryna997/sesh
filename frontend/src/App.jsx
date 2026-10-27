@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 import AppLayout from './components/layout/AppLayout'
 import PageLayout from './components/layout/PageLayout'
+import RequireAuth from './auth/RequireAuth'
+import PublicOnlyRoute from './auth/PublicOnlyRoute'
 import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
@@ -18,24 +20,36 @@ const UiPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/UiPreviewPa
 const ApiHealthPage = import.meta.env.DEV ? lazy(() => import('./dev/ApiHealthPage')) : null
 const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/MemberHeaderPreviewPage')) : null
 
-// All routes share AppLayout (header + navigation). Until authentication
-// exists, AppLayout shows the visitor header (Log in / Create account).
-// The landing page (/) is full-width; every other page is wrapped in
-// PageLayout, which adds the standard page padding.
+// All routes share AppLayout (header + navigation), whose header follows
+// the sign-in state. The landing page (/) is full-width; every other page
+// is wrapped in PageLayout, which adds the standard page padding (compact
+// under the header for /login and /register).
+//
+// - Public: /, the 404 page and the dev pages.
+// - PublicOnlyRoute: /login and /register (signed-in users are sent on).
+// - RequireAuth: the app pages; visitors are sent to /login?returnTo=...
 function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
 
+        <Route element={<PageLayout compact />}>
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="register" element={<RegisterPage />} />
+            <Route path="login" element={<LoginPage />} />
+          </Route>
+        </Route>
+
         <Route element={<PageLayout />}>
-          <Route path="register" element={<RegisterPage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="discover" element={<DiscoverPage />} />
-          <Route path="status" element={<StatusPage />} />
-          <Route path="messages" element={<MessagesPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="settings" element={<SettingsPage />} />
+
+          <Route element={<RequireAuth />}>
+            <Route path="discover" element={<DiscoverPage />} />
+            <Route path="status" element={<StatusPage />} />
+            <Route path="messages" element={<MessagesPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
           {UiPreviewPage && (
             <Route
               path="ui-preview"

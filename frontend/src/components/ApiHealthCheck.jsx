@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
+import { apiRequest } from '../api/client'
+import { getRequestErrorMessage } from '../api/errorMessages'
 
-// Base URL of the backend API, read from frontend/.env
-const API_URL = import.meta.env.VITE_API_URL
-
-// Temporary development helper: shows whether the frontend can reach the API.
+// Temporary development helper: shows whether the frontend can reach the API
+// (through the same /api path as every other request).
 function ApiHealthCheck() {
   // status is one of: 'loading', 'success', 'error'
   const [status, setStatus] = useState('loading')
@@ -12,18 +12,12 @@ function ApiHealthCheck() {
   useEffect(() => {
     async function checkApiHealth() {
       try {
-        const response = await fetch(`${API_URL}/api/v1/health`)
-
-        if (!response.ok) {
-          throw new Error(`Server responded with status ${response.status}`)
-        }
-
-        const data = await response.json()
+        const data = await apiRequest('/health')
         setStatus('success')
         setMessage(data.message)
       } catch (error) {
         setStatus('error')
-        setMessage(`Could not connect to the API. ${error.message}`)
+        setMessage(`Could not connect to the API. ${getRequestErrorMessage(error)}`)
       }
     }
 

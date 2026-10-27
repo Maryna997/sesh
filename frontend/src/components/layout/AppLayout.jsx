@@ -7,9 +7,9 @@ import Header from './Header'
 // landing hero can reach the screen edges; regular pages get their
 // padding from PageLayout.
 //
-// `isAuthenticated` picks the header variant. It is false until real
-// authentication exists (it will then come from the signed-in user).
-function AppLayout({ isAuthenticated = false }) {
+// The header follows the real sign-in state. `isAuthenticated` is only
+// passed by the dev-only header preview to force a variant.
+function AppLayout({ isAuthenticated }) {
   return (
     <div className="flex min-h-screen flex-col">
       <Header isAuthenticated={isAuthenticated} />

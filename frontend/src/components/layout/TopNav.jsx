@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router'
 import { topNavItems } from '../../config/navigation'
+import AccountMenu from './AccountMenu'
 
 // Horizontal navigation for signed-in surfers, shown on tablet and desktop
 // (hidden on mobile, where the burger menu is used instead).
@@ -7,7 +8,8 @@ import { topNavItems } from '../../config/navigation'
 // screen readers, and we use its isActive flag to make the link bold.
 //
 // Tablet keeps the Figma layout of four equal columns. Desktop uses equal
-// gaps between the links so they look evenly spaced.
+// gaps between the links so they look evenly spaced. The fourth item,
+// "My profile", is the AccountMenu (My Profile, Settings & Privacy, Log out).
 function TopNav() {
   return (
     <nav aria-label="Main" className="hidden md:block">
@@ -35,6 +37,9 @@ function TopNav() {
             </NavLink>
           </li>
         ))}
+        <li>
+          <AccountMenu />
+        </li>
       </ul>
     </nav>
   )

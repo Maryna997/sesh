@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router'
-import { LogOut, X } from 'lucide-react'
+import { LoaderCircle, LogOut, X } from 'lucide-react'
 import { menuNavItems } from '../../config/navigation'
 import { trapTabKey } from '../../utils/trapFocus'
+import { useLogout } from '../../auth/useLogout'
 
 export const MOBILE_MENU_ID = 'mobile-menu'
 
@@ -12,9 +13,13 @@ export const MOBILE_MENU_ID = 'mobile-menu'
 // - closes on Escape, on backdrop click and when a link is chosen,
 // - keeps Tab / Shift+Tab cycling inside the menu (a "focus trap"),
 // - stops the page behind it from scrolling.
+// The last item logs the user out (see useLogout).
 function MobileMenu({ onClose }) {
   const panelRef = useRef(null)
   const closeButtonRef = useRef(null)
+  // Logging out closes the menu and goes home only after the server has
+  // ended the session; if it fails, the menu stays open with the error.
+  const { logoutAndLeave, isLoggingOut, error: logoutError } = useLogout({ onSuccess: onClose })
 
   useEffect(() => {
     closeButtonRef.current?.focus()
@@ -90,22 +95,28 @@ function MobileMenu({ onClose }) {
               </li>
             ))}
 
-            {/* Placeholder until authentication exists */}
             <li>
               <button
                 type="button"
-                disabled
-                className="flex h-[51px] w-full cursor-not-allowed items-center gap-4 rounded-[10px] bg-logout-bg pr-3 pl-[19px] text-left text-sm text-logout"
+                onClick={logoutAndLeave}
+                disabled={isLoggingOut}
+                aria-busy={isLoggingOut || undefined}
+                className="flex h-[51px] w-full items-center gap-4 rounded-[10px] bg-logout-bg pr-3 pl-[19px] text-left text-sm text-logout hover:bg-menu-active focus-visible:outline-2 focus-visible:outline-blue disabled:cursor-wait"
               >
                 <span aria-hidden="true" className="flex w-5 justify-center">
-                  <LogOut size={16} />
+                  {isLoggingOut ? <LoaderCircle size={16} className="animate-spin" /> : <LogOut size={16} />}
                 </span>
-                Log out
-                <span className="ml-auto text-[11px] text-muted">Coming soon</span>
+                {isLoggingOut ? 'Logging out…' : 'Log out'}
               </button>
             </li>
           </ul>
         </nav>
+
+        {logoutError && (
+          <p role="alert" className="mt-4 rounded-[10px] bg-danger-soft px-4 py-3 text-xs text-danger-ink">
+            {logoutError}
+          </p>
+        )}
 
         <p className="mt-auto pt-10 pl-2 text-[11px] text-teal">
           More spontaneity, more shared sessions

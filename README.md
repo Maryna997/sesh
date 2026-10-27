@@ -12,9 +12,9 @@ Good waves are better together, and Sesh is built to make it easier to arrange a
 - Backend user registration API with secure password hashing
 - JWT authentication (log in, log out, current user)
 - Server-side session management, so logging out ends the session immediately
+- Registration, login and logout in the app, with protected pages for signed-in surfers
 
 **In development**
-- Registration and login interface in the app
 - Surfer profiles
 - Surf spot selection and availability statuses (Active, Coming Soon, At the Spot, Invisible / Off)
 - Surfer discovery and filtering
@@ -41,7 +41,7 @@ git clone https://github.com/Maryna997/sesh.git
 cd sesh
 
 cd backend && npm install && cp .env.example .env
-cd ../frontend && npm install && cp .env.example .env
+cd ../frontend && npm install
 ```
 On Windows Command Prompt, use `copy .env.example .env`.
 
@@ -55,7 +55,7 @@ Fill in `backend/.env` (all options are described in `backend/.env.example`):
 | `DATABASE_URL` | Supabase **session pooler** connection string (port 5432): `postgresql://postgres.<project-ref>:<password>@<host>.pooler.supabase.com:5432/postgres` |
 | `JWT_SECRET`   | A long random value, e.g. from `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 
-`frontend/.env` needs `VITE_API_URL=http://localhost:5000`.
+The frontend needs no `.env` file. It calls the API with relative `/api/...` paths, and the Vite dev server forwards them to `http://localhost:5000` (see `frontend/.env.example` to use a different address). Because the app and the API then share one origin, the session cookie works in every browser.
 
 Never commit `.env` files or real credentials.
 
@@ -75,10 +75,14 @@ cd frontend && npm run dev    # app on http://localhost:5173
 ```
 Check the API at http://localhost:5000/api/v1/health.
 
+### Deployment note
+In production the frontend also calls `/api/...` on its own domain, so `frontend/vercel.json` must forward `/api/*` to the Render backend **before** the single-page-app fallback. This rewrite is added once the Render URL is known; until then, the deployed app cannot reach the API.
+
 ## Testing
 
 ```bash
 cd backend && npm test        # backend unit and API tests
+cd frontend && npm test       # frontend component and flow tests (API mocked)
 cd frontend && npm run lint   # frontend linting
 cd frontend && npm run build  # frontend production build
 ```
@@ -86,7 +90,7 @@ The backend API tests need a migrated database. They only create and remove thei
 
 ## Project status
 
-Sesh is being developed as an individual Software Engineering capstone project. It is an MVP under active development: the foundations, landing page and backend authentication are in place, and the core surfer features are being built.
+Sesh is being developed as an individual Software Engineering capstone project. It is an MVP under active development: the foundations, landing page and authentication are in place, and the core surfer features are being built.
 
 ## Copyright
 

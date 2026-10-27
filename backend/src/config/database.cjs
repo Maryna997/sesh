@@ -37,6 +37,11 @@ const config = {
 
 module.exports = {
   development: config,
-  test: config,
+  // Tests use TEST_DATABASE_URL when it is set (a separate database, so tests
+  // never touch real data); otherwise they fall back to DATABASE_URL.
+  test: {
+    ...config,
+    use_env_variable: process.env.TEST_DATABASE_URL ? 'TEST_DATABASE_URL' : 'DATABASE_URL',
+  },
   production: config,
 };

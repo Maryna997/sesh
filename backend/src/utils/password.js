@@ -34,3 +34,29 @@ export function normalizePassword(password) {
 export function hashPassword(password) {
   return bcrypt.hash(normalizePassword(password), BCRYPT_ROUNDS);
 }
+
+// bcrypt only reads the first 72 bytes (see validation.js)
+const BCRYPT_MAX_BYTES = 72;
+
+// A hash of a random value, compared against when the email doesn't exist,
+// so that "unknown email" takes as long as "wrong password". Otherwise the
+// response time would reveal which emails have accounts.
+let dummyHashPromise;
+function getDummyHash() {
+  dummyHashPromise ??= bcrypt.hash(`no-such-user-${Math.random()}`, BCRYPT_ROUNDS);
+  return dummyHashPromise;
+}
+
+// Checks a login password against a stored hash (or null when there is no
+// such user). Uses the same normalization as hashPassword. Passwords over
+// 72 bytes never match: bcrypt would otherwise silently compare only their
+// first 72 bytes.
+export async function verifyPassword(password, storedHash) {
+  const normalized = normalizePassword(password);
+  const tooLong = Buffer.byteLength(normalized, 'utf8') > BCRYPT_MAX_BYTES;
+
+  // Always run one bcrypt comparison, whatever the outcome, for equal timing
+  const matches = await bcrypt.compare(tooLong ? '' : normalized, storedHash ?? (await getDummyHash()));
+
+  return Boolean(storedHash) && !tooLong && matches;
+}

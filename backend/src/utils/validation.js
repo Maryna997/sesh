@@ -71,3 +71,41 @@ export function validateRegistration(body) {
 
   return { data: { email: normalizedEmail, password } };
 }
+
+// Checks the login body. Only presence, type and email format are checked:
+// password length rules are not revealed at login. A password that couldn't
+// have been registered simply fails as "incorrect email or password".
+export function validateLogin(body) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { errors: { body: 'Request body must be a JSON object with email and password.' } };
+  }
+
+  const { email, password } = body;
+  const errors = {};
+  let normalizedEmail;
+
+  if (isMissing(email)) {
+    errors.email = 'Email is required.';
+  } else if (typeof email !== 'string') {
+    errors.email = 'Email must be a string.';
+  } else {
+    normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      errors.email = 'Email is required.';
+    } else if (normalizedEmail.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(normalizedEmail)) {
+      errors.email = 'Enter a valid email address, like you@example.com.';
+    }
+  }
+
+  if (isMissing(password)) {
+    errors.password = 'Password is required.';
+  } else if (typeof password !== 'string') {
+    errors.password = 'Password must be a string.';
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { errors };
+  }
+
+  return { data: { email: normalizedEmail, password } };
+}

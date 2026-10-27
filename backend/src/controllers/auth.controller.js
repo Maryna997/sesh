@@ -1,6 +1,6 @@
 import { Op, UniqueConstraintError, fn, col, where } from 'sequelize';
-import { User } from '../models/User.js';
-import { Session } from '../models/Session.js';
+import { Session, SurferProfile, User } from '../models/index.js';
+import { isProfileComplete } from '../utils/profileValidation.js';
 import { authConfig } from '../config/auth.js';
 import { validateLogin, validateRegistration } from '../utils/validation.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
@@ -107,12 +107,19 @@ export async function logout(req, res) {
 }
 
 // GET /api/v1/auth/me (protected by requireAuth)
-// Returns the signed-in user's account details.
+// Returns the signed-in user's account details and whether they have
+// completed their surfer profile (onboarding). The profile is loaded in the
+// same query, only the fields needed for that check, and never created here.
 export async function me(req, res) {
-  const user = await User.findByPk(req.auth.userId);
+  const user = await User.findByPk(req.auth.userId, {
+    include: [{ model: SurferProfile, as: 'surferProfile', attributes: ['userId', 'displayName', 'skillLevel'] }],
+  });
 
   // The account was deleted after this session was created
   if (!user) return rejectUnauthenticated(req, res);
 
-  return res.status(200).json({ user: toPublicUser(user) });
+  return res.status(200).json({
+    user: toPublicUser(user),
+    hasCompletedProfile: isProfileComplete(user.surferProfile),
+  });
 }

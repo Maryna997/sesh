@@ -3,7 +3,8 @@ import { sequelize } from '../db/index.js';
 import { normalizeEmail } from '../utils/validation.js';
 
 // A Sesh account: authentication data only.
-// Profile details belong to the SurferProfile model (a later task).
+// Profile details (name, level, board, spots) belong to the SurferProfile
+// model; associations are declared in models/index.js.
 //
 // Database constraints (see the create-users migration):
 // - id: UUID primary key, generated automatically

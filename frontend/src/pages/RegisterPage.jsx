@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 import { ArrowRight } from 'lucide-react'
 import AuthPageLayout from '../components/auth/AuthPageLayout'
+import registerImage from '../assets/register-ocean.jpg'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
@@ -104,7 +105,7 @@ function RegisterPage() {
 
   if (createdEmail) {
     return (
-      <AuthPageLayout pageName="Register" heading="Create your account" description="Join the surf community in minutes.">
+      <AuthPageLayout pageName="Register" heading="Create your account" description="Join the surf community in minutes." image={registerImage}>
         <div ref={successRef} tabIndex={-1} className="outline-none">
           <Alert variant="success" title="Your account has been created">
             You can now log in with <strong>{createdEmail}</strong>.
@@ -118,7 +119,7 @@ function RegisterPage() {
   }
 
   return (
-    <AuthPageLayout pageName="Register" heading="Create your account" description="Join the surf community in minutes.">
+    <AuthPageLayout pageName="Register" heading="Create your account" description="Join the surf community in minutes." image={registerImage}>
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-6" aria-label="Create account">
         {formError && <Alert>{formError}</Alert>}
 

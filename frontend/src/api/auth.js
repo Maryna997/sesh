@@ -17,7 +17,7 @@ export function logOut() {
   return apiRequest('/auth/logout', { method: 'POST' })
 }
 
-// GET /api/v1/auth/me -> { user } when signed in; 401 otherwise.
+// GET /api/v1/auth/me -> { user, hasCompletedProfile } when signed in; 401 otherwise.
 export function getCurrentUser() {
   return apiRequest('/auth/me')
 }

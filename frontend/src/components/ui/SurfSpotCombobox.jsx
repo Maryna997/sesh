@@ -24,6 +24,7 @@ function SurfSpotCombobox({
   helperText,
   error,
   required = false,
+  optional = false,
   disabled = false,
   id,
   className = '',
@@ -130,6 +131,7 @@ function SurfSpotCombobox({
       id={inputId}
       label={label}
       required={required}
+      optional={optional}
       helperText={helperText}
       error={error}
       className={className}

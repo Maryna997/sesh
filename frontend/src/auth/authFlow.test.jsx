@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { jsonResponse, mockApi, renderApp, responses } from '../test/utils'
+import { jsonResponse, loginSessionRoutes, mockApi, renderApp, responses } from '../test/utils'
 
 const ME = 'GET /api/v1/auth/me'
-const LOGIN = 'POST /api/v1/auth/login'
 const LOGOUT = 'POST /api/v1/auth/logout'
 const location = () => screen.getByTestId('location').textContent
 
@@ -73,7 +72,7 @@ describe('protected and public routes', () => {
 
   test('full flow: protected page -> login -> back to that page', async () => {
     const user = userEvent.setup()
-    mockApi({ [ME]: responses.signedOut, [LOGIN]: () => responses.signedIn() })
+    mockApi(loginSessionRoutes(() => responses.loggedIn()))
     renderApp('/settings')
     await screen.findByRole('heading', { name: 'Welcome back' })
 

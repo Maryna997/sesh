@@ -1,11 +1,19 @@
 // Label + control + helper/error text, stacked vertically.
 // Used by Input and Select so all form fields share one layout.
-function Field({ id, label, required, helperText, error, className = '', children }) {
+// `optional` adds a muted "(Optional)" after the label; `required` adds a red *.
+function Field({ id, label, required, optional = false, helperText, error, className = '', children }) {
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       {label && (
         <label htmlFor={id} className="text-xs font-bold text-ink">
           {label}
+          {/* A real space (not only a margin), so the name reads "Board (Optional)" */}
+          {optional && (
+            <>
+              {' '}
+              <span className="font-normal text-muted">(Optional)</span>
+            </>
+          )}
           {required && (
             <span className="ml-0.5 text-danger" aria-hidden="true">
               *

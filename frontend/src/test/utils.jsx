@@ -18,7 +18,10 @@ export function jsonResponse(status, body) {
 
 export const responses = {
   signedOut: () => jsonResponse(401, { status: 'error', message: 'Authentication required.' }),
-  signedIn: (user = TEST_USER) => jsonResponse(200, { user }),
+  // GET /auth/me for a signed-in user (with a completed profile by default)
+  signedIn: (user = TEST_USER, { hasCompletedProfile = true } = {}) => jsonResponse(200, { user, hasCompletedProfile }),
+  // POST /auth/login success (the real response has no profile status)
+  loggedIn: (user = TEST_USER) => jsonResponse(200, { user }),
   networkError: () => {
     throw new TypeError('Failed to fetch')
   },
@@ -38,6 +41,22 @@ export function mockApi(routes) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
+}
+
+// Routes for a fake session that starts signed out, like a real browser:
+// GET /auth/me answers 401 until `login` returns a successful response,
+// then answers as signed in. `login` is the POST /auth/login handler.
+export function loginSessionRoutes(login, { hasCompletedProfile = true } = {}) {
+  let isSignedIn = false
+  return {
+    'GET /api/v1/auth/me': () =>
+      isSignedIn ? responses.signedIn(TEST_USER, { hasCompletedProfile }) : responses.signedOut(),
+    'POST /api/v1/auth/login': async (options) => {
+      const response = await login(options)
+      if (response.ok) isSignedIn = true
+      return response
+    },
+  }
 }
 
 // The parsed JSON body of the n-th call to a given endpoint

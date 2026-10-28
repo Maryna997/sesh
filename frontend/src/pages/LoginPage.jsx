@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 import { ArrowRight } from 'lucide-react'
 import AuthPageLayout from '../components/auth/AuthPageLayout'
+import loginImage from '../assets/login-ocean.jpg'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
@@ -81,6 +82,7 @@ function LoginPage() {
   return (
     <AuthPageLayout
       pageName="Login"
+      image={loginImage}
       heading="Welcome back"
       description="Log in to find your next surf buddy."
       centerOnTablet

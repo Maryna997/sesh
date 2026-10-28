@@ -1,8 +1,8 @@
 import { Link } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
-import heroImage from '../../assets/hero-ocean.jpg'
 
-// Layout of the Login and Register pages, from the Figma auth frames:
+// Layout of the Login, Register and Create Profile pages, from the Figma
+// auth and onboarding ("Complete surfer profile") frames:
 // - A back arrow at the top left. It links to the home page rather than
 //   "browser back", which could leave Sesh when the page was opened directly.
 // - Tablet and desktop: an intro column (eyebrow, page name, tagline, photo)
@@ -20,7 +20,10 @@ import heroImage from '../../assets/hero-ocean.jpg'
 // Register form is about as tall as the intro column and keeps its layout.
 // The grid row grows with its content, so nothing is clipped on short
 // screens; the page simply scrolls.
-function AuthPageLayout({ pageName, heading, description, centerOnTablet = false, children }) {
+//
+// `image` is the page's photo in the intro column (each page has its own in
+// Figma); it is decorative, so it has no alternative text.
+function AuthPageLayout({ pageName, heading, description, image, centerOnTablet = false, children }) {
   return (
     <>
       <Link
@@ -38,7 +41,7 @@ function AuthPageLayout({ pageName, heading, description, centerOnTablet = false
             Find your people. Share your plans. Keep the freedom to change them.
           </p>
           <img
-            src={heroImage}
+            src={image}
             alt=""
             className="mt-14 h-[175px] w-full max-w-[520px] rounded-[28px] object-cover lg:h-[320px]"
           />

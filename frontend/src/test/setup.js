@@ -8,6 +8,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+// jsdom has no scrollIntoView (SurfSpotCombobox keeps the highlighted
+// result visible with it). Layout doesn't exist in jsdom, so it does nothing.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+
 // jsdom has no matchMedia (the Header uses it to close the burger menu on
 // wider screens). Tests run as if on a narrow screen.
 if (!window.matchMedia) {

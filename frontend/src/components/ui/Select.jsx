@@ -8,6 +8,10 @@ import { fieldBaseClasses, fieldBorderClass, getDescriptionIds } from './fieldSt
 //
 // `options` is a list of { value, label, disabled? }.
 // `placeholder` adds an empty first option ("Choose a level").
+// `clearLabel` (optional fields only) hides the placeholder from the list and
+// adds a first option with that label ("No board selected") that resets the
+// value to empty; the closed field then shows the placeholder again.
+// `optional` shows "(Optional)" after the label.
 //
 // Variants:
 // - "field" (default): full-width form field, same look as Input.
@@ -19,23 +23,27 @@ function Select({
   id,
   options = [],
   placeholder,
+  clearLabel,
   helperText,
   error,
   required = false,
+  optional = false,
   variant = 'field',
   className = '',
   ...rest
 }) {
   const generatedId = useId()
   const selectId = id ?? generatedId
+  const canClear = Boolean(clearLabel) && !required
 
   const optionElements = (
     <>
       {placeholder && (
-        <option value="" disabled={required}>
+        <option value="" disabled={required} hidden={canClear}>
           {placeholder}
         </option>
       )}
+      {canClear && <option value="">{clearLabel}</option>}
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>
           {option.label}
@@ -80,6 +88,7 @@ function Select({
       id={selectId}
       label={label}
       required={required}
+      optional={optional}
       helperText={helperText}
       error={error}
       className={className}

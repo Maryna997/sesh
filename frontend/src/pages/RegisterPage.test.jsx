@@ -27,6 +27,14 @@ const submit = (user) => user.click(screen.getByRole('button', { name: 'Create a
 const registerCalls = (fetchMock) => fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/register')
 
 describe('Registration page', () => {
+  test('shows the Figma register photo (decorative)', async () => {
+    await openRegister()
+    const photos = [...document.querySelectorAll('main img')]
+    expect(photos).toHaveLength(1)
+    expect(photos[0].getAttribute('src')).toMatch(/register-ocean/)
+    expect(photos[0].getAttribute('alt')).toBe('')
+  })
+
   test('successful registration shows a confirmation and a link to log in', async () => {
     const user = userEvent.setup()
     const fetchMock = await openRegister({ [REGISTER]: () => created() })

@@ -8,6 +8,9 @@
 
 export const DEFAULT_AFTER_LOGIN = '/discover'
 
+// Onboarding page for signed-in users who have no surfer profile yet
+export const CREATE_PROFILE_PATH = '/create-profile'
+
 // Pages it makes no sense to return to after logging in
 const AUTH_PAGES = new Set(['/login', '/register'])
 

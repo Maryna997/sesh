@@ -4,9 +4,12 @@ import AppLayout from './components/layout/AppLayout'
 import PageLayout from './components/layout/PageLayout'
 import RequireAuth from './auth/RequireAuth'
 import PublicOnlyRoute from './auth/PublicOnlyRoute'
+import OnboardingRoute from './auth/OnboardingRoute'
+import RequireCompletedProfile from './auth/RequireCompletedProfile'
 import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
+import CreateProfilePage from './pages/CreateProfilePage'
 import DiscoverPage from './pages/DiscoverPage'
 import StatusPage from './pages/StatusPage'
 import MessagesPage from './pages/MessagesPage'
@@ -23,11 +26,14 @@ const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/M
 // All routes share AppLayout (header + navigation), whose header follows
 // the sign-in state. The landing page (/) is full-width; every other page
 // is wrapped in PageLayout, which adds the standard page padding (compact
-// under the header for /login and /register).
+// under the header for /login, /register and /create-profile).
 //
 // - Public: /, the 404 page and the dev pages.
 // - PublicOnlyRoute: /login and /register (signed-in users are sent on).
-// - RequireAuth: the app pages; visitors are sent to /login?returnTo=...
+// - RequireAuth: signed-in pages; visitors are sent to /login?returnTo=...
+//   - OnboardingRoute: /create-profile, only until the profile exists.
+//   - RequireCompletedProfile: the app pages, only once the profile exists.
+// Register -> Log in -> Create profile -> Discover.
 function App() {
   return (
     <Routes>
@@ -39,16 +45,24 @@ function App() {
             <Route path="register" element={<RegisterPage />} />
             <Route path="login" element={<LoginPage />} />
           </Route>
+
+          <Route element={<RequireAuth />}>
+            <Route element={<OnboardingRoute />}>
+              <Route path="create-profile" element={<CreateProfilePage />} />
+            </Route>
+          </Route>
         </Route>
 
         <Route element={<PageLayout />}>
 
           <Route element={<RequireAuth />}>
-            <Route path="discover" element={<DiscoverPage />} />
-            <Route path="status" element={<StatusPage />} />
-            <Route path="messages" element={<MessagesPage />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route element={<RequireCompletedProfile />}>
+              <Route path="discover" element={<DiscoverPage />} />
+              <Route path="status" element={<StatusPage />} />
+              <Route path="messages" element={<MessagesPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
           </Route>
           {UiPreviewPage && (
             <Route

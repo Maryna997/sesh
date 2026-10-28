@@ -554,7 +554,7 @@ describe('profile access (GET /api/v1/profiles/:userId)', () => {
   });
 });
 
-describe('avatar fields (prepared for Cloudinary uploads)', () => {
+describe('avatar fields through the general profile endpoint', () => {
   test('profiles are created without an avatar; both avatar columns stay NULL', async () => {
     const user = await signedInUser('avatar-none');
     const response = await putMine(user, VALID_PROFILE);
@@ -579,7 +579,7 @@ describe('avatar fields (prepared for Cloudinary uploads)', () => {
       assert.equal(response.status, 400, JSON.stringify(body));
       assert.equal(response.body.message, 'Please check the profile details.');
       for (const field of ['avatarUrl', 'avatarPublicId'].filter((name) => name in body)) {
-        assert.equal(response.body.errors[field], 'Profile picture uploads are not available yet.');
+        assert.equal(response.body.errors[field], 'Change your profile picture with the photo upload instead.');
       }
     }
 

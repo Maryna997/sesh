@@ -35,14 +35,18 @@ async function readJson(response) {
   }
 }
 
+// `body` is sent as JSON, except FormData (file uploads), which is sent as
+// multipart/form-data; the browser then sets the Content-Type itself.
 export async function apiRequest(path, { method = 'GET', body } = {}) {
+  const isForm = body instanceof FormData
+  const isJson = body !== undefined && !isForm
   let response
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       credentials: 'include',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: isJson ? { 'Content-Type': 'application/json' } : undefined,
+      body: isJson ? JSON.stringify(body) : body,
     })
   } catch {
     throw new ApiError('network')

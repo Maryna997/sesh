@@ -22,3 +22,10 @@ delete process.env.COOKIE_SECURE;
 delete process.env.COOKIE_SAME_SITE;
 
 export const TEST_CLIENT_ORIGIN = process.env.CLIENT_URL;
+
+// Cloudinary: tests never use the real account. These dummy values only
+// enable the avatar endpoints; the tests replace every Cloudinary call with
+// a mock (see avatar.test.js), so nothing is ever sent to Cloudinary.
+process.env.CLOUDINARY_CLOUD_NAME = 'sesh-test-cloud';
+process.env.CLOUDINARY_API_KEY = '000000000000000';
+process.env.CLOUDINARY_API_SECRET = 'test-only-not-a-real-secret';

@@ -14,6 +14,14 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
+// jsdom has no object URLs (used for local photo previews). Tests get fake
+// "blob:" URLs; a test can spy on these to check that previews are revoked.
+if (!URL.createObjectURL) {
+  let nextPreview = 0
+  URL.createObjectURL = () => `blob:sesh-test/${++nextPreview}`
+  URL.revokeObjectURL = () => {}
+}
+
 // jsdom has no matchMedia (the Header uses it to close the burger menu on
 // wider screens). Tests run as if on a narrow screen.
 if (!window.matchMedia) {

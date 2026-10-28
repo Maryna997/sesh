@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { jsonResponse, mockApi, renderApp, requestBody, responses } from '../test/utils'
@@ -45,7 +45,8 @@ const levelField = () => screen.getByLabelText(/^surf level/i)
 const boardField = () => screen.getByLabelText(/^board/i)
 const aboutField = () => screen.getByLabelText(/^about/i)
 const spotField = () => screen.getByRole('combobox', { name: /favorite surf spots/i })
-const saveButton = () => screen.getByRole('button', { name: /save profile|saving profile/i })
+// The form's submit button, whatever it currently says (Save / Saving / Uploading)
+const saveButton = () => screen.getByRole('form', { name: 'Create your surfer profile' }).querySelector('button[type="submit"]')
 
 async function waitForSpots() {
   await waitFor(() => expect(spotField().disabled).toBe(false))
@@ -67,7 +68,7 @@ async function fillRequired(user, { name = 'Kai Silva', level = 'intermediate' }
 }
 
 describe('Create Profile form', () => {
-  test('shows the Figma fields, a non-interactive photo placeholder and no upload control', async () => {
+  test('shows the Figma fields and an optional photo picker', async () => {
     await openCreateProfile()
     expect(screen.getByText('Complete surfer profile')).toBeTruthy()
     expect(nameField()).toBeTruthy()
@@ -75,9 +76,9 @@ describe('Create Profile form', () => {
     expect(boardField()).toBeTruthy()
     expect(spotField()).toBeTruthy()
     expect(aboutField()).toBeTruthy()
-    expect(screen.getByText(/Photo uploads are coming soon/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /photo/i })).toBeNull()
-    expect(document.querySelector('input[type="file"]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add photo' })).toBeTruthy()
+    expect(screen.getByText('JPEG, PNG or WebP, up to 5 MB.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull()
   })
 
   test('shows the Figma onboarding photo (decorative)', async () => {
@@ -492,5 +493,187 @@ describe('saving the profile', () => {
     const fetchMock = await openCreateProfile()
     await waitForSpots()
     expect(saveCalls(fetchMock)).toHaveLength(0)
+  })
+})
+
+describe('optional profile photo during onboarding', () => {
+  const AVATAR = 'POST /api/v1/profile/me/avatar'
+  const CLOUD_URL = 'https://res.cloudinary.com/sesh/image/upload/v1/sesh/avatars/abc.jpg'
+  const photoFile = (name = 'me.jpg', type = 'image/jpeg', size = 1024) => new File([new Uint8Array(size)], name, { type })
+  const photoInput = () => document.querySelector('input[type="file"]')
+  const previewImage = () => document.querySelector('main img[src^="blob:"]')
+  const uploaded = () => jsonResponse(200, { profile: { userId: 'u1', displayName: 'Kai Silva', avatarUrl: CLOUD_URL } })
+  const avatarCalls = (fetchMock) =>
+    fetchMock.mock.calls.filter(([url, options = {}]) => url === '/api/v1/profile/me/avatar' && options.method === 'POST')
+  const callOrder = (fetchMock) => fetchMock.mock.calls.map(([url, options = {}]) => `${options.method ?? 'GET'} ${url}`)
+
+  test('initials are shown until a photo is chosen; a chosen photo is previewed and can be removed', async () => {
+    const user = userEvent.setup()
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    await openCreateProfile()
+
+    await user.type(nameField(), 'Kai Silva')
+    expect(screen.getByText('KS')).toBeTruthy()
+    expect(previewImage()).toBeNull()
+
+    await user.upload(photoInput(), photoFile())
+    const preview = previewImage()
+    expect(preview).toBeTruthy()
+    expect(screen.queryByText('KS')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Change photo' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }))
+    expect(previewImage()).toBeNull()
+    expect(screen.getByText('KS')).toBeTruthy()
+    expect(revoke).toHaveBeenCalledWith(preview.getAttribute('src'))
+  })
+
+  test('the tile avatar is 64px on mobile, 88px on tablet and 104px on desktop (photo and initials)', async () => {
+    const user = userEvent.setup()
+    await openCreateProfile()
+    await user.type(nameField(), 'Kai Silva')
+    const responsiveSize = ['size-16', 'text-[21px]', 'md:size-[88px]', 'lg:size-[104px]']
+    const initials = screen.getByText('KS')
+    for (const name of [...responsiveSize, 'rounded-full', 'items-center', 'justify-center']) expect(initials.classList).toContain(name)
+
+    await user.upload(photoInput(), photoFile())
+    for (const name of [...responsiveSize, 'rounded-full', 'object-cover']) expect(previewImage().classList).toContain(name)
+  })
+
+  test('changing the photo replaces the preview and frees the old one', async () => {
+    const user = userEvent.setup()
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    await openCreateProfile()
+    await user.upload(photoInput(), photoFile('a.jpg'))
+    const first = previewImage().getAttribute('src')
+    await user.upload(photoInput(), photoFile('b.png', 'image/png'))
+    expect(previewImage().getAttribute('src')).not.toBe(first)
+    expect(revoke).toHaveBeenCalledWith(first)
+  })
+
+  test('unsupported or oversized files are refused with a message', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    await openCreateProfile()
+
+    await user.upload(photoInput(), photoFile('anim.gif', 'image/gif'))
+    expect(screen.getByRole('alert').textContent).toBe('Choose a JPEG, PNG or WebP image.')
+    expect(previewImage()).toBeNull()
+
+    await user.upload(photoInput(), photoFile('huge.jpg', 'image/jpeg', 5 * 1024 * 1024 + 1))
+    expect(screen.getByRole('alert').textContent).toBe('Choose an image of at most 5 MB.')
+    expect(previewImage()).toBeNull()
+
+    // A valid file clears the message
+    await user.upload(photoInput(), photoFile())
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(previewImage()).toBeTruthy()
+  })
+
+  test('without a photo, no upload is attempted', async () => {
+    const user = userEvent.setup()
+    const fetchMock = await openCreateProfile()
+    await fillRequired(user)
+    await user.click(saveButton())
+    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(avatarCalls(fetchMock)).toHaveLength(0)
+  })
+
+  test('with a photo: profile first, then the photo, then the session check -> Discover', async () => {
+    const user = userEvent.setup()
+    const fetchMock = await openCreateProfile({ routes: { [AVATAR]: uploaded } })
+    await fillRequired(user)
+    const file = photoFile()
+    await user.upload(photoInput(), file)
+    await user.click(saveButton())
+
+    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    const order = callOrder(fetchMock).filter((key) => [SAVE, AVATAR, ME].includes(key))
+    expect(order.slice(-3)).toEqual([SAVE, AVATAR, ME])
+
+    const [, options] = avatarCalls(fetchMock)[0]
+    expect(options.credentials).toBe('include')
+    expect(options.body).toBeInstanceOf(FormData)
+    expect(options.body.get('avatar')).toBe(file)
+    expect(options.headers).toBeUndefined() // the browser sets the multipart boundary
+    // The photo is never sent with the profile fields
+    expect(requestBody(fetchMock, SAVE)).not.toHaveProperty('avatarUrl')
+  })
+
+  test('shows "Uploading photo…" while the photo uploads and blocks double submits', async () => {
+    const user = userEvent.setup()
+    let finish
+    const fetchMock = await openCreateProfile({ routes: { [AVATAR]: () => new Promise((resolve) => (finish = resolve)) } })
+    await fillRequired(user)
+    await user.upload(photoInput(), photoFile())
+    await user.click(saveButton())
+
+    await screen.findAllByRole('button', { name: /Uploading photo/ })
+    expect(saveButton().disabled).toBe(true)
+    screen.getByRole('form', { name: 'Create your surfer profile' }).requestSubmit()
+    expect(saveCalls(fetchMock)).toHaveLength(1)
+    expect(avatarCalls(fetchMock)).toHaveLength(1)
+
+    finish(uploaded())
+    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+  })
+
+  test('a failed upload keeps the saved profile; the user can retry the photo', async () => {
+    const user = userEvent.setup()
+    let fail = true
+    const fetchMock = await openCreateProfile({
+      routes: {
+        [AVATAR]: () =>
+          fail ? jsonResponse(502, { status: 'error', message: 'We couldn’t upload your picture. Please try again.' }) : uploaded(),
+      },
+    })
+    await fillRequired(user)
+    await user.upload(photoInput(), photoFile())
+    await user.click(saveButton())
+
+    const alert = (await screen.findByText(/Your profile was saved, but the photo wasn’t uploaded/)).closest('[role="alert"]')
+    expect(alert.textContent).toMatch(/We couldn’t upload your picture/)
+    expect(location()).toBe('/create-profile')
+    expect(nameField().value).toBe('Kai Silva')
+    expect(previewImage()).toBeTruthy() // the chosen photo is kept for the retry
+    expect(saveCalls(fetchMock)).toHaveLength(1)
+
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Try the photo again' }))
+    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(saveCalls(fetchMock)).toHaveLength(1) // the profile was not saved twice
+    expect(avatarCalls(fetchMock)).toHaveLength(2)
+  })
+
+  test('after a failed upload the user can continue without a photo', async () => {
+    const user = userEvent.setup()
+    const fetchMock = await openCreateProfile({ routes: { [AVATAR]: responses.networkError } })
+    await fillRequired(user)
+    await user.upload(photoInput(), photoFile())
+    await user.click(saveButton())
+
+    await screen.findByText(/Your profile was saved, but the photo wasn’t uploaded/)
+    expect(screen.getByText(/couldn’t reach Sesh/)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Continue without photo' }))
+    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(avatarCalls(fetchMock)).toHaveLength(1)
+  })
+
+  test('the server’s reason for refusing a photo is shown', async () => {
+    const user = userEvent.setup()
+    await openCreateProfile({
+      routes: {
+        [AVATAR]: () =>
+          jsonResponse(400, {
+            status: 'error',
+            message: 'Please check the profile picture.',
+            errors: { avatar: 'Profile picture must be a JPEG, PNG or WebP image.' },
+          }),
+      },
+    })
+    await fillRequired(user)
+    await user.upload(photoInput(), photoFile())
+    await user.click(saveButton())
+    const alert = (await screen.findByText(/photo wasn’t uploaded/)).closest('[role="alert"]')
+    expect(alert.textContent).toMatch(/must be a JPEG, PNG or WebP image/)
   })
 })

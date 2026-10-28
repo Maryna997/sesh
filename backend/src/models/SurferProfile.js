@@ -14,8 +14,9 @@ import { sequelize } from '../db/index.js';
 // - board_type, about: optional (allowed values checked by the API)
 // - avatar_url, avatar_public_id: profile picture on Cloudinary (URL to
 //   display, and the id used to replace or delete it). Set only by the
-//   backend once uploads exist; NULL for now. avatarPublicId is internal and
-//   never included in API responses.
+//   avatar endpoints (POST/DELETE /api/v1/profile/me/avatar); NULL when the
+//   surfer has no picture. avatarPublicId is internal and never included in
+//   API responses.
 export const SurferProfile = sequelize.define(
   'SurferProfile',
   {

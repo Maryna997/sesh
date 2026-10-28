@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router'
 import AuthPageLayout from '../components/auth/AuthPageLayout'
 import onboardingImage from '../assets/onboarding-ocean.jpg'
 import FavoriteSpotsPicker from '../components/profile/FavoriteSpotsPicker'
-import ProfilePhotoPlaceholder from '../components/profile/ProfilePhotoPlaceholder'
+import ProfilePhotoField from '../components/profile/ProfilePhotoField'
 import Alert from '../components/ui/Alert'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import Select from '../components/ui/Select'
 import Textarea from '../components/ui/Textarea'
-import { getMyProfile, getSurfSpots, saveMyProfile } from '../api/profile'
+import { getMyProfile, getSurfSpots, saveMyProfile, uploadAvatar } from '../api/profile'
+import { useLocalPhoto } from '../hooks/useLocalPhoto'
+import { getAvatarErrorMessage } from '../utils/avatarFile'
 import { getRequestErrorMessage, SERVER_ERROR_MESSAGE } from '../api/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { AUTH_STATUS } from '../auth/authContext'
@@ -47,12 +49,22 @@ function fetchSurfSpots() {
 // /create-profile: onboarding step between logging in and using Sesh.
 // Only signed-in users without a surfer profile get here (see OnboardingRoute).
 //
-// The first valid PUT /api/v1/profile/me creates the profile. The page then
-// asks the server again (GET /auth/me) and only moves on to Discover once the
-// server confirms the profile is complete.
+// Saving, in this order (a photo needs an existing profile):
+// 1. PUT /api/v1/profile/me creates the profile.
+// 2. If a photo was chosen, POST /api/v1/profile/me/avatar uploads it. If
+//    that fails, the saved profile is kept and the user can retry the photo
+//    or continue without it.
+// 3. GET /auth/me: move on to Discover only once the server confirms the
+//    profile is complete.
 function CreateProfilePage() {
   const { refreshSession } = useAuth()
   const navigate = useNavigate()
+  const photo = useLocalPhoto()
+  const [photoError, setPhotoError] = useState(null)
+  // 'profile' or 'photo': what the submit button is currently doing
+  const [savingStep, setSavingStep] = useState('profile')
+  // True once the profile exists but its photo upload failed
+  const [photoUploadFailed, setPhotoUploadFailed] = useState(false)
 
   const [values, setValues] = useState({ displayName: '', skillLevel: '', boardType: '', about: '', favoriteSpotIds: [] })
   const [touched, setTouched] = useState({})
@@ -120,6 +132,64 @@ function CreateProfilePage() {
     else refs[field]?.current?.focus()
   }
 
+  // The server is the source of truth for onboarding: move on only once
+  // GET /auth/me confirms the completed profile.
+  async function finishOnboarding() {
+    const session = await refreshSession()
+    if (session.status === AUTH_STATUS.AUTHENTICATED && session.hasCompletedProfile) {
+      navigate(DEFAULT_AFTER_LOGIN, { replace: true })
+    } else if (session.status !== AUTH_STATUS.UNAUTHENTICATED) {
+      // (Signed out: RequireAuth already sends the user to log in.)
+      setFormError(SAVED_NOT_CONFIRMED_MESSAGE)
+    }
+  }
+
+  // Uploads the chosen photo (if any). Returns false when the upload failed.
+  async function uploadChosenPhoto() {
+    if (!photo.file) return true
+    setSavingStep('photo')
+    try {
+      await uploadAvatar(photo.file)
+      setPhotoUploadFailed(false)
+      setPhotoError(null)
+      return true
+    } catch (error) {
+      setPhotoUploadFailed(true)
+      setPhotoError(getAvatarErrorMessage(error))
+      return false
+    }
+  }
+
+  // Runs one save step at a time; blocks double clicks and double submits
+  async function runExclusive(step) {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
+    try {
+      await step()
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
+      setSavingStep('profile')
+    }
+  }
+
+  // After a failed photo upload: try the photo again, or continue without it
+  function retryPhoto() {
+    return runExclusive(async () => {
+      if (await uploadChosenPhoto()) await finishOnboarding()
+    })
+  }
+
+  function continueWithoutPhoto() {
+    return runExclusive(async () => {
+      photo.setFile(null)
+      setPhotoUploadFailed(false)
+      setPhotoError(null)
+      await finishOnboarding()
+    })
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     if (submittingRef.current) return
@@ -135,16 +205,7 @@ function CreateProfilePage() {
     setIsSubmitting(true)
     try {
       await saveMyProfile(buildProfilePayload(values))
-
-      // The server is the source of truth for onboarding: move on only once
-      // GET /auth/me confirms the completed profile.
-      const session = await refreshSession()
-      if (session.status === AUTH_STATUS.AUTHENTICATED && session.hasCompletedProfile) {
-        navigate(DEFAULT_AFTER_LOGIN, { replace: true })
-      } else if (session.status !== AUTH_STATUS.UNAUTHENTICATED) {
-        // (Signed out: RequireAuth already sends the user to log in.)
-        setFormError(SAVED_NOT_CONFIRMED_MESSAGE)
-      }
+      if (await uploadChosenPhoto()) await finishOnboarding()
     } catch (error) {
       if (error.kind === 'http' && error.status === 400 && error.fieldErrors) {
         const fieldErrors = Object.fromEntries(FIELDS.map((field) => [field, error.fieldErrors[field]]))
@@ -162,7 +223,18 @@ function CreateProfilePage() {
     } finally {
       submittingRef.current = false
       setIsSubmitting(false)
+      setSavingStep('profile')
     }
+  }
+
+  function choosePhoto(file) {
+    photo.setFile(file)
+    setPhotoError(null)
+  }
+
+  function removePhoto() {
+    photo.setFile(null)
+    setPhotoError(null)
   }
 
   const aboutLength = characterCount(normalizeAbout(values.about))
@@ -177,7 +249,32 @@ function CreateProfilePage() {
       <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-6" aria-label="Create your surfer profile">
         {formError && <Alert>{formError}</Alert>}
 
-        <ProfilePhotoPlaceholder displayName={values.displayName} />
+        {photoUploadFailed && (
+          <div>
+            <Alert title="Your profile was saved, but the photo wasn’t uploaded">
+              {photoError} You can try again, or continue and add a photo later on My Profile.
+            </Alert>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={retryPhoto} disabled={isSubmitting}>
+                Try the photo again
+              </Button>
+              <Button variant="outline" size="sm" onClick={continueWithoutPhoto} disabled={isSubmitting}>
+                Continue without photo
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <ProfilePhotoField
+          displayName={values.displayName}
+          imageUrl={photo.previewUrl}
+          avatarSize="photoField"
+          optional
+          busy={isSubmitting && savingStep === 'photo'}
+          error={photoUploadFailed ? undefined : photoError}
+          onSelectFile={choosePhoto}
+          onRemove={removePhoto}
+        />
 
         <p className="-mb-2 text-[11px] text-muted">
           Fields marked <span className="text-danger" aria-hidden="true">*</span>
@@ -250,7 +347,7 @@ function CreateProfilePage() {
         />
 
         <Button type="submit" size="lg" fullWidth loading={isSubmitting} className="mt-2">
-          {isSubmitting ? 'Saving profile…' : 'Save profile'}
+          {!isSubmitting ? 'Save profile' : savingStep === 'photo' ? 'Uploading photo…' : 'Saving profile…'}
         </Button>
       </form>
     </AuthPageLayout>

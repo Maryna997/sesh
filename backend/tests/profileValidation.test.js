@@ -111,7 +111,7 @@ describe('validateProfileInput', () => {
   });
 
   test('avatar fields cannot be set by the client; null or "" is ignored', () => {
-    const message = 'Profile picture uploads are not available yet.';
+    const message = 'Change your profile picture with the photo upload instead.';
     assert.equal(errorsFor({ avatarUrl: 'https://example.com/me.jpg' }).avatarUrl, message);
     assert.equal(errorsFor({ avatarPublicId: 'sesh/avatars/someone' }).avatarPublicId, message);
     assert.deepEqual(validateProfileInput({ avatarUrl: null, avatarPublicId: '' }), { data: {} });

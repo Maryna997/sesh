@@ -133,13 +133,13 @@ export function validateProfileInput(body) {
     else data[field] = result.value;
   }
 
-  // Profile pictures will be uploaded to Cloudinary through a dedicated
-  // endpoint (a later task), and only the backend sets the avatar fields.
+  // Profile pictures are uploaded to Cloudinary through a dedicated
+  // endpoint (POST /profile/me/avatar), and only the backend sets the avatar fields.
   // Accepting arbitrary image URLs here would let profiles load content from
   // any server whenever someone views them. null or "" is simply ignored.
   for (const field of ['avatarUrl', 'avatarPublicId']) {
     if (Object.hasOwn(body, field) && !isBlank(body[field])) {
-      errors[field] = 'Profile picture uploads are not available yet.';
+      errors[field] = 'Change your profile picture with the photo upload instead.';
     }
   }
 

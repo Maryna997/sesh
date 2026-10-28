@@ -21,12 +21,12 @@ function toPublicProfile(profile) {
 }
 
 // The owner's own view adds when the profile was created and last changed
-function toOwnProfile(profile) {
+export function toOwnProfile(profile) {
   return { ...toPublicProfile(profile), createdAt: profile.createdAt, updatedAt: profile.updatedAt };
 }
 
 // Loads a profile with its favourite spots (alphabetical), or null
-function findProfile(userId) {
+export function findProfile(userId) {
   return SurferProfile.findByPk(userId, {
     include: [{ model: SurfSpot, as: 'favoriteSpots', through: { attributes: [] } }],
     order: [[{ model: SurfSpot, as: 'favoriteSpots' }, 'name', 'ASC']],

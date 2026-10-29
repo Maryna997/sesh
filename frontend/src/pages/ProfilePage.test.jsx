@@ -23,7 +23,8 @@ const profileResponse = (avatarUrl) => jsonResponse(200, { profile: profile(avat
 
 const photoFile = (name = 'me.jpg', type = 'image/jpeg') => new File([new Uint8Array(512)], name, { type })
 const photoInput = () => document.querySelector('input[type="file"]')
-const shownImage = () => document.querySelector('main img')
+// The round avatar image in the profile panel (not the page photo or row icons)
+const shownImage = () => document.querySelector('main section img.rounded-full')
 const calls = (fetchMock, key) => fetchMock.mock.calls.filter(([url, options = {}]) => `${options.method ?? 'GET'} ${url}` === key)
 
 async function openProfile({ avatarUrl = null, routes = {} } = {}) {
@@ -36,7 +37,7 @@ async function openProfile({ avatarUrl = null, routes = {} } = {}) {
 describe('My Profile picture', () => {
   test('without a picture: initials and "Add photo"', async () => {
     await openProfile()
-    expect(screen.getByRole('heading', { name: 'My Profile' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'My profile' })).toBeTruthy()
     expect(screen.getByText('EL')).toBeTruthy()
     expect(shownImage()).toBeNull()
     expect(screen.getByRole('button', { name: 'Add photo' })).toBeTruthy()

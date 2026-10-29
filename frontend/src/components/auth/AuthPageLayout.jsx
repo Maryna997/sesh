@@ -21,6 +21,13 @@ import { ArrowLeft } from 'lucide-react'
 // The grid row grows with its content, so nothing is clipped on short
 // screens; the page simply scrolls.
 //
+// Column widths (the grid fills the page area between PageLayout's margins,
+// so the two columns together are always centered):
+// - tablet (md): intro column + fixed 390px panel, as in the Figma frames
+// - small desktop (lg, 1024–1279px): two equal columns. A fixed 520px panel
+//   would leave the intro column only ~300px wide at 1024px.
+// - desktop (xl, 1280px+): intro column + the Figma 520px panel
+//
 // `image` is the page's photo in the intro column (each page has its own in
 // Figma); it is decorative, so it has no alternative text.
 function AuthPageLayout({ pageName, heading, description, image, centerOnTablet = false, children }) {
@@ -33,7 +40,10 @@ function AuthPageLayout({ pageName, heading, description, image, centerOnTablet 
       >
         <ArrowLeft size={24} aria-hidden="true" />
       </Link>
-      <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_390px] lg:grid-cols-[minmax(0,1fr)_520px] lg:gap-16">
+      <div
+        data-testid="auth-layout-grid"
+        className="grid gap-8 md:grid-cols-[minmax(0,1fr)_390px] lg:grid-cols-2 lg:gap-12 xl:grid-cols-[minmax(0,1fr)_520px] xl:gap-16"
+      >
         <div className="hidden md:block md:pt-12 lg:pt-6">
           <p className="text-xs font-bold whitespace-pre-wrap text-link">{'SESH  /  SURF COMMUNITY'}</p>
           <p className="mt-8 text-[30px] font-bold text-ink lg:text-4xl">{pageName}</p>

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createMyAvailability, getMyAvailability } from '../controllers/availability.controller.js';
+import { createMyAvailability, getMyAvailability, updateMyAvailability } from '../controllers/availability.controller.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireCompletedProfile } from '../middleware/requireCompletedProfile.js';
 
@@ -13,5 +13,8 @@ router.get('/me', requireAuth, requireCompletedProfile, getMyAvailability);
 
 // POST /api/v1/availability/me - set your first availability
 router.post('/me', requireAuth, requireCompletedProfile, createMyAvailability);
+
+// PUT /api/v1/availability/me - change, switch off or reactivate your availability
+router.put('/me', requireAuth, requireCompletedProfile, updateMyAvailability);
 
 export default router;

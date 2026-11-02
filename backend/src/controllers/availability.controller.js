@@ -1,16 +1,19 @@
 import { UniqueConstraintError } from 'sequelize';
+import { sequelize } from '../db/index.js';
 import { SurfSpot, SurferAvailability } from '../models/index.js';
 import { buildAvailability, toAvailabilityResponse } from '../utils/availabilityRules.js';
 import { clock } from '../utils/clock.js';
 
-// The signed-in surfer's availability: GET and POST /api/v1/availability/me.
-// The owner always comes from the session (req.auth.userId); arrival times
-// and the expiry are calculated here from one captured "now".
+// The signed-in surfer's availability: GET, POST and PUT
+// /api/v1/availability/me. The owner always comes from the session
+// (req.auth.userId); arrival times and the expiry are calculated here from
+// one captured "now".
 
-function findAvailability(userId) {
+function findAvailability(userId, transaction) {
   return SurferAvailability.findOne({
     where: { userId },
     include: [{ model: SurfSpot, as: 'spot' }],
+    transaction,
   });
 }
 
@@ -36,8 +39,8 @@ export async function getMyAvailability(req, res) {
 }
 
 // POST /api/v1/availability/me (requires authentication and a completed profile)
-// Creates the first availability (201). If one already exists, 409: changing
-// it is a separate update request (Task 7.3).
+// Creates the first availability (201). If one already exists (even expired
+// or Off), 409: changing it is PUT.
 export async function createMyAvailability(req, res) {
   const now = clock.now();
   const { userId } = req.auth;
@@ -62,4 +65,49 @@ export async function createMyAvailability(req, res) {
 
   const row = await findAvailability(userId);
   return res.status(201).json({ availability: toAvailabilityResponse(row, now) });
+}
+
+// PUT /api/v1/availability/me (requires authentication and a completed profile)
+// Replaces the current availability with the requested one (200): any status
+// to any status, including Off, and reactivating an expired or Off record.
+// Every PUT is a fresh declaration: the expiry is recalculated from now, even
+// when the status is the same (e.g. At the Spot again = "still here").
+//
+// Replacement, not a merge: buildAvailability returns every stored field,
+// with the ones the new status doesn't use set to null, so old arrival data
+// or an old spot can never be carried over. The same row (and id) is kept.
+// 404 if no availability exists yet: the first one is created with POST.
+export async function updateMyAvailability(req, res) {
+  const now = clock.now();
+  const { userId } = req.auth;
+
+  // Validate everything before touching the stored record
+  const { errors, data } = buildAvailability(req.body, now);
+  if (errors) return rejectInvalid(res, errors);
+
+  if (data.spotId && !(await SurfSpot.findByPk(data.spotId, { attributes: ['id'] }))) {
+    return rejectInvalid(res, { spotId: 'Choose a surf spot from the list.' });
+  }
+
+  // The row is locked while it is replaced, so concurrent updates run one
+  // after another; each writes a complete status in a single UPDATE, and its
+  // response is read before the lock is released (it shows its own result).
+  const updated = await sequelize.transaction(async (transaction) => {
+    const row = await SurferAvailability.findOne({ where: { userId }, transaction, lock: transaction.LOCK.UPDATE });
+    if (!row) return null;
+
+    row.set(data);
+    row.changed('updatedAt', true); // also a "renewal" with identical values
+    await row.save({ transaction });
+    return findAvailability(userId, transaction);
+  });
+
+  if (!updated) {
+    return res.status(404).json({
+      status: 'error',
+      code: 'AVAILABILITY_NOT_FOUND',
+      message: 'You haven’t set an availability status yet.',
+    });
+  }
+  return res.status(200).json({ availability: toAvailabilityResponse(updated, now) });
 }

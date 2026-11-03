@@ -104,7 +104,7 @@ describe('mobile burger menu', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn(), [LOGOUT]: () => jsonResponse(200, { status: 'ok', message: 'Logged out.' }) })
     renderApp('/status')
-    await screen.findByRole('heading', { name: 'My Status' })
+    await screen.findByRole('heading', { name: 'Your surf availability' })
 
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('button', { name: 'Log out' }))
@@ -119,7 +119,7 @@ describe('mobile burger menu', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn(), [LOGOUT]: responses.serverError })
     renderApp('/status')
-    await screen.findByRole('heading', { name: 'My Status' })
+    await screen.findByRole('heading', { name: 'Your surf availability' })
 
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('button', { name: 'Log out' }))

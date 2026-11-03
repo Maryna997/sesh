@@ -11,7 +11,7 @@ describe('session restoration', () => {
   test('a valid session restores the signed-in state on load', async () => {
     const fetchMock = mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/status')
-    expect(await screen.findByRole('heading', { name: 'My Status' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Your surf availability' })).toBeTruthy()
     expect(location()).toBe('/status')
     expect(fetchMock.mock.calls[0][1].credentials).toBe('include')
   })

@@ -26,7 +26,7 @@ const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/M
 // All routes share AppLayout (header + navigation), whose header follows
 // the sign-in state. The landing page (/) is full-width; every other page
 // is wrapped in PageLayout, which adds the standard page padding (compact
-// under the header for /login, /register, /create-profile and /profile).
+// under the header for /login, /register, /create-profile, /profile and /status).
 //
 // - Public: /, the 404 page and the dev pages.
 // - PublicOnlyRoute: /login and /register (signed-in users are sent on).
@@ -50,9 +50,10 @@ function App() {
             <Route element={<OnboardingRoute />}>
               <Route path="create-profile" element={<CreateProfilePage />} />
             </Route>
-            {/* My Profile uses the same two-column layout (Figma) */}
+            {/* My Profile and My Status use the same two-column layout (Figma) */}
             <Route element={<RequireCompletedProfile />}>
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="status" element={<StatusPage />} />
             </Route>
           </Route>
         </Route>
@@ -62,7 +63,6 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<RequireCompletedProfile />}>
               <Route path="discover" element={<DiscoverPage />} />
-              <Route path="status" element={<StatusPage />} />
               <Route path="messages" element={<MessagesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

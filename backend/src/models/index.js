@@ -33,4 +33,8 @@ SurferAvailability.belongsTo(User, { foreignKey: 'userId' });
 SurferAvailability.belongsTo(SurfSpot, { foreignKey: 'spotId', as: 'spot' });
 SurfSpot.hasMany(SurferAvailability, { foreignKey: 'spotId', as: 'availabilities' });
 
+// Availability and profile share user_id, so Discover can join them directly
+// (no database constraint between them: both belong to the user)
+SurferAvailability.belongsTo(SurferProfile, { foreignKey: 'userId', targetKey: 'userId', as: 'profile', constraints: false });
+
 export { User, Session, SurfSpot, SurferProfile, FavoriteSpot, SurferAvailability };

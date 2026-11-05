@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import surfSpotRoutes from './routes/surfSpot.routes.js';
 import availabilityRoutes from './routes/availability.routes.js';
+import discoverRoutes from './routes/discover.routes.js';
 import { requireTrustedOrigin } from './middleware/requireTrustedOrigin.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -31,6 +32,7 @@ app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/surf-spots', surfSpotRoutes);
 app.use('/api/v1/availability', availabilityRoutes);
+app.use('/api/v1/discover', discoverRoutes);
 app.use('/api/v1', profileRoutes);
 
 // Any other route returns a 404 JSON response

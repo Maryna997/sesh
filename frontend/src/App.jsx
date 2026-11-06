@@ -15,6 +15,7 @@ import StatusPage from './pages/StatusPage'
 import MessagesPage from './pages/MessagesPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
+import SurferProfilePage from './pages/SurferProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // Development-only pages. In a production build import.meta.env.DEV is
@@ -26,7 +27,8 @@ const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/M
 // All routes share AppLayout (header + navigation), whose header follows
 // the sign-in state. The landing page (/) is full-width; every other page
 // is wrapped in PageLayout, which adds the standard page padding (compact
-// under the header for /login, /register, /create-profile, /profile and /status).
+// under the header for /login, /register, /create-profile, /discover, /profile
+// and /status).
 //
 // - Public: /, the 404 page and the dev pages.
 // - PublicOnlyRoute: /login and /register (signed-in users are sent on).
@@ -50,8 +52,9 @@ function App() {
             <Route element={<OnboardingRoute />}>
               <Route path="create-profile" element={<CreateProfilePage />} />
             </Route>
-            {/* My Profile and My Status use the same two-column layout (Figma) */}
+            {/* Discover, My Profile and My Status use the same two-column layout (Figma) */}
             <Route element={<RequireCompletedProfile />}>
+              <Route path="discover" element={<DiscoverPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="status" element={<StatusPage />} />
             </Route>
@@ -62,7 +65,8 @@ function App() {
 
           <Route element={<RequireAuth />}>
             <Route element={<RequireCompletedProfile />}>
-              <Route path="discover" element={<DiscoverPage />} />
+              {/* Another surfer's public profile (placeholder until Task 8.5) */}
+              <Route path="surfers/:userId" element={<SurferProfilePage />} />
               <Route path="messages" element={<MessagesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

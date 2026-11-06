@@ -13,7 +13,8 @@ import { AVAILABILITY } from '../../config/availability'
 // - time: optional arrival time shown with the status ("Coming soon · 16:30")
 // - to: optional route; makes the whole card a link to the surfer's profile
 // - action: optional element in the bottom-right corner (e.g. a "Message" button)
-function SurferCard({ name, avatarUrl, level, status, time, spot, board, to, action, className = '' }) {
+// - note: optional extra line under the spot (e.g. "Coming around 17:00")
+function SurferCard({ name, avatarUrl, level, status, time, spot, board, note, to, action, className = '' }) {
   const statusLabel = AVAILABILITY[status]?.cardLabel
   const availability = [statusLabel, time].filter(Boolean).join(' · ')
   const details = [level, availability].filter(Boolean).join(' · ')
@@ -54,6 +55,8 @@ function SurferCard({ name, avatarUrl, level, status, time, spot, board, to, act
             {action && <div className="relative z-10 ml-auto">{action}</div>}
           </div>
         )}
+
+        {note && <p className="text-xs text-muted">{note}</p>}
       </div>
     </article>
   )

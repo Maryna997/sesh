@@ -26,7 +26,7 @@ describe('signed-in navigation (tablet and desktop)', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     const main = screen.getAllByRole('navigation', { name: 'Main' })[0]
     expect(within(main).getByRole('link', { name: 'Discover' }).getAttribute('aria-current')).toBe('page')
@@ -51,7 +51,7 @@ describe('signed-in navigation (tablet and desktop)', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     const trigger = screen.getByRole('button', { name: 'My profile' })
     trigger.focus()
@@ -75,7 +75,7 @@ describe('mobile burger menu', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     const menu = await openMenu(user)
     const labels = within(menu).getAllByRole('link').map((link) => link.textContent.trim())
@@ -91,7 +91,7 @@ describe('mobile burger menu', () => {
     const user = userEvent.setup()
     mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     await openMenu(user)
     expect(document.activeElement.getAttribute('aria-label')).toBe('Close menu')

@@ -34,7 +34,7 @@ describe('Login page', () => {
 
     await logInWith(user, '  Surfer@Example.COM ')
 
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(location()).toBe('/discover')
     expect(requestBody(fetchMock, LOGIN)).toEqual({ email: 'surfer@example.com', password: PASSWORD })
     // Request carries the cookie; no token is ever handled by the page
@@ -55,7 +55,7 @@ describe('Login page', () => {
     const user = userEvent.setup()
     await openLogin('/login?returnTo=https%3A%2F%2Fevil.example', { [LOGIN]: () => responses.loggedIn() })
     await logInWith(user)
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(location()).toBe('/discover')
   })
 
@@ -114,15 +114,16 @@ describe('Login page', () => {
     expect(loginCalls(fetchMock)).toHaveLength(1)
     expect(screen.getByRole('button', { name: /Logging in/ }).disabled).toBe(true)
     finish(responses.loggedIn())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
   })
 
   test('after login, the profile status is read from GET /auth/me', async () => {
     const user = userEvent.setup()
     const fetchMock = await openLogin('/login', { [LOGIN]: () => responses.loggedIn() })
     await logInWith(user)
-    await screen.findByRole('heading', { name: 'Discover' })
-    const urls = fetchMock.mock.calls.map(([url]) => url)
+    await screen.findByRole('heading', { name: 'Available surfers' })
+    // (Discover then loads its own data; only the auth requests matter here)
+    const urls = fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith('/api/v1/auth/'))
     expect(urls.slice(-2)).toEqual(['/api/v1/auth/login', '/api/v1/auth/me'])
   })
 

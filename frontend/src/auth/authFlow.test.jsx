@@ -23,13 +23,13 @@ describe('session restoration', () => {
 
     expect(screen.getByRole('status').textContent).toMatch(/Checking your session/)
     expect(location()).toBe('/discover')
-    expect(screen.queryByRole('heading', { name: 'Discover' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Available surfers' })).toBeNull()
     // Neither visitor actions nor app navigation are shown yet
     expect(screen.queryByRole('link', { name: 'Create account' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
 
     answer(responses.signedIn())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
   })
 
   test('a network failure is not treated as logged out', async () => {
@@ -118,7 +118,7 @@ describe('logout', () => {
       [LOGOUT]: () => jsonResponse(200, { status: 'ok', message: 'Logged out.' }),
     })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     await user.click(screen.getByRole('button', { name: 'My profile' }))
     await user.click(screen.getByRole('button', { name: 'Log out' }))
@@ -151,9 +151,14 @@ describe('logout', () => {
 
   test('a failed logout keeps the user signed in and explains why', async () => {
     const user = userEvent.setup()
-    mockApi({ [ME]: () => responses.signedIn(), [LOGOUT]: responses.networkError })
+    mockApi({
+      [ME]: () => responses.signedIn(),
+      [LOGOUT]: responses.networkError,
+      'GET /api/v1/discover': () => jsonResponse(200, { surfers: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }),
+      'GET /api/v1/surf-spots': () => jsonResponse(200, { spots: [] }),
+    })
     renderApp('/discover')
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
 
     await user.click(screen.getByRole('button', { name: 'My profile' }))
     await user.click(screen.getByRole('button', { name: 'Log out' }))
@@ -161,7 +166,7 @@ describe('logout', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toMatch(/Logout failed/)
     expect(location()).toBe('/discover')
-    expect(screen.getByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Create account' })).toBeNull()
     expect(within(alert.parentElement).getByRole('button', { name: 'Log out' })).toBeTruthy()
   })

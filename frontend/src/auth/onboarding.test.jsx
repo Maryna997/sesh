@@ -48,7 +48,8 @@ describe('onboarding routes', () => {
     async (path) => {
       mockApi({ [ME]: () => responses.signedIn() })
       renderApp(path)
-      await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+      // The session check has finished (pages may have their own status regions)
+      await waitFor(() => expect(screen.queryByText('Checking your session…')).toBeNull())
       expect(location()).toBe(path)
     },
   )
@@ -56,7 +57,7 @@ describe('onboarding routes', () => {
   test('users with a profile are not taken through onboarding again', async () => {
     mockApi({ [ME]: () => responses.signedIn() })
     renderApp('/create-profile')
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(location()).toBe('/discover')
   })
 
@@ -98,13 +99,13 @@ describe('onboarding routes', () => {
     renderApp('/discover')
 
     expect(screen.getByRole('status').textContent).toMatch(/Checking your session/)
-    expect(screen.queryByRole('heading', { name: 'Discover' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Available surfers' })).toBeNull()
     expect(screen.queryByRole('heading', { name: CREATE_PROFILE_HEADING })).toBeNull()
     expect(location()).toBe('/discover')
 
     answer(withoutProfile())
     expect(await screen.findByRole('heading', { name: CREATE_PROFILE_HEADING })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Discover' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Available surfers' })).toBeNull()
   })
 
   test('Create Profile also waits for the session check', async () => {
@@ -114,7 +115,7 @@ describe('onboarding routes', () => {
     expect(screen.getByRole('status').textContent).toMatch(/Checking your session/)
     expect(screen.queryByRole('heading', { name: CREATE_PROFILE_HEADING })).toBeNull()
     answer(responses.signedIn())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
   })
 
   test('a failed session check shows "try again", not a redirect', async () => {
@@ -143,7 +144,7 @@ describe('onboarding routes', () => {
       [SPOTS]: () => jsonResponse(200, { spots: [] }),
     })
     renderApp('/create-profile')
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(location()).toBe('/discover')
   })
 })

@@ -345,7 +345,7 @@ describe('favorite spots', () => {
     await screen.findByRole('alert')
     await fillRequired(user)
     await user.click(saveButton())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(requestBody(fetchMock, SAVE).favoriteSpotIds).toEqual([])
   })
 })
@@ -364,7 +364,7 @@ describe('saving the profile', () => {
     await user.type(aboutField(), '  Dawn patrol fan.  ')
     await user.click(saveButton())
 
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(location()).toBe('/discover')
 
     const saveCall = saveCalls(fetchMock)[0]
@@ -395,7 +395,7 @@ describe('saving the profile', () => {
     const fetchMock = await openCreateProfile()
     await fillRequired(user)
     await user.click(saveButton())
-    await screen.findByRole('heading', { name: 'Discover' })
+    await screen.findByRole('heading', { name: 'Available surfers' })
     const urls = fetchMock.mock.calls.map(([url, options = {}]) => `${options.method ?? 'GET'} ${url}`)
     expect(urls.indexOf(ME, urls.indexOf(SAVE))).toBeGreaterThan(urls.indexOf(SAVE))
   })
@@ -458,7 +458,7 @@ describe('saving the profile', () => {
 
     fail = false
     await user.click(saveButton())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(saveCalls(fetchMock)).toHaveLength(2)
   })
 
@@ -485,7 +485,7 @@ describe('saving the profile', () => {
     expect(saveCalls(fetchMock)).toHaveLength(1)
 
     finish(savedProfile())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(saveCalls(fetchMock)).toHaveLength(1)
   })
 
@@ -574,7 +574,7 @@ describe('optional profile photo during onboarding', () => {
     const fetchMock = await openCreateProfile()
     await fillRequired(user)
     await user.click(saveButton())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(avatarCalls(fetchMock)).toHaveLength(0)
   })
 
@@ -586,7 +586,7 @@ describe('optional profile photo during onboarding', () => {
     await user.upload(photoInput(), file)
     await user.click(saveButton())
 
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     const order = callOrder(fetchMock).filter((key) => [SAVE, AVATAR, ME].includes(key))
     expect(order.slice(-3)).toEqual([SAVE, AVATAR, ME])
 
@@ -614,7 +614,7 @@ describe('optional profile photo during onboarding', () => {
     expect(avatarCalls(fetchMock)).toHaveLength(1)
 
     finish(uploaded())
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
   })
 
   test('a failed upload keeps the saved profile; the user can retry the photo', async () => {
@@ -639,7 +639,7 @@ describe('optional profile photo during onboarding', () => {
 
     fail = false
     await user.click(screen.getByRole('button', { name: 'Try the photo again' }))
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(saveCalls(fetchMock)).toHaveLength(1) // the profile was not saved twice
     expect(avatarCalls(fetchMock)).toHaveLength(2)
   })
@@ -654,7 +654,7 @@ describe('optional profile photo during onboarding', () => {
     await screen.findByText(/Your profile was saved, but the photo wasn’t uploaded/)
     expect(screen.getByText(/couldn’t reach Sesh/)).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Continue without photo' }))
-    expect(await screen.findByRole('heading', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Available surfers' })).toBeTruthy()
     expect(avatarCalls(fetchMock)).toHaveLength(1)
   })
 

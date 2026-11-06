@@ -7,16 +7,51 @@
 // and the expiry time are never included; the full public profile is a
 // separate request (GET /api/v1/profiles/:userId).
 import { API_STATUS } from './availabilityRules.js';
+import { SKILL_LEVELS } from './profileValidation.js';
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 50;
 
-// Accepted query parameters (filters will be added in the next task)
-const QUERY_FIELDS = ['page', 'limit'];
+// Accepted query parameters: pagination and the optional filters
+const QUERY_FIELDS = ['page', 'limit', 'spotId', 'skillLevel', 'status', 'arrivalFrom', 'arrivalTo'];
 const POSITIVE_INTEGER = /^[1-9]\d{0,8}$/;
 
-// Returns { errors } or { page, limit }
+// Surf spot ids look like "pt-cascais-carcavelos" (whether it exists is
+// checked against the database by the controller)
+const SPOT_ID = /^[a-z0-9-]{1,100}$/;
+
+// Statuses that can appear in Discover (API name -> stored value); OFF never does
+const DISCOVERABLE_STATUS = { ACTIVE: 'active', COMING_SOON: 'coming_soon', AT_SPOT: 'at_spot' };
+
+// ISO 8601 date-time with seconds optional and an explicit offset (Z or ±hh:mm),
+// e.g. 2026-11-06T14:00:00Z. Without an offset the instant would depend on the
+// server's time zone, so it is rejected.
+const TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-](\d{2}):(\d{2}))$/;
+
+// The instant of a strict ISO timestamp, or null. Date.parse alone accepts
+// impossible dates (30 February becomes 2 March) and 24:00, so the calendar
+// parts are checked first.
+export function parseTimestamp(value) {
+  if (typeof value !== 'string') return null;
+  const match = TIMESTAMP.exec(value);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second = '0', , offsetHours = '0', offsetMinutes = '0'] = match;
+  const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+  if (
+    Number(month) < 1 || Number(month) > 12 ||
+    Number(day) < 1 || Number(day) > daysInMonth ||
+    Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59 ||
+    Number(offsetHours) > 14 || Number(offsetMinutes) > 59
+  ) {
+    return null;
+  }
+  const instant = new Date(value);
+  return Number.isNaN(instant.getTime()) ? null : instant;
+}
+
+// Returns { errors } or { page, limit, filters }.
+// filters: { spotId?, skillLevel?, status? (stored value), arrivalFrom?, arrivalTo? (Dates) }
 export function parseDiscoverQuery(query) {
   const errors = {};
 
@@ -24,11 +59,14 @@ export function parseDiscoverQuery(query) {
     if (!QUERY_FIELDS.includes(field)) errors[field] = 'This filter isn’t supported.';
   }
 
+  // Repeated parameters (?page=1&page=2) arrive as arrays and are rejected
+  const single = (field) => (typeof query[field] === 'string' ? query[field] : undefined);
+  const isRepeated = (field) => query[field] !== undefined && typeof query[field] !== 'string';
+
   function positiveInteger(field, fallback) {
     const raw = query[field];
     if (raw === undefined) return fallback;
-    // Repeated parameters (?page=1&page=2) arrive as arrays
-    if (typeof raw !== 'string' || !POSITIVE_INTEGER.test(raw)) {
+    if (isRepeated(field) || !POSITIVE_INTEGER.test(raw)) {
       errors[field] = `${field === 'page' ? 'Page' : 'Limit'} must be a whole number of 1 or more.`;
       return fallback;
     }
@@ -39,8 +77,45 @@ export function parseDiscoverQuery(query) {
   const limit = positiveInteger('limit', DEFAULT_LIMIT);
   if (!errors.limit && limit > MAX_LIMIT) errors.limit = `Limit must be at most ${MAX_LIMIT}.`;
 
+  const filters = {};
+
+  if (query.spotId !== undefined) {
+    if (isRepeated('spotId') || !SPOT_ID.test(single('spotId'))) errors.spotId = 'Choose a surf spot from the list.';
+    else filters.spotId = query.spotId;
+  }
+
+  if (query.skillLevel !== undefined) {
+    if (isRepeated('skillLevel') || !SKILL_LEVELS.includes(single('skillLevel'))) {
+      errors.skillLevel = `Skill level must be one of: ${SKILL_LEVELS.join(', ')}.`;
+    } else {
+      filters.skillLevel = query.skillLevel;
+    }
+  }
+
+  if (query.status !== undefined) {
+    const stored = DISCOVERABLE_STATUS[single('status')];
+    if (isRepeated('status') || !stored) {
+      errors.status = `Status must be one of: ${Object.keys(DISCOVERABLE_STATUS).join(', ')}.`;
+    } else {
+      filters.status = stored;
+    }
+  }
+
+  for (const field of ['arrivalFrom', 'arrivalTo']) {
+    if (query[field] === undefined) continue;
+    const instant = isRepeated(field) ? null : parseTimestamp(single(field));
+    if (!instant) {
+      errors[field] = 'Use a date and time with a time zone, like 2026-11-06T14:00:00Z.';
+    } else {
+      filters[field] = instant;
+    }
+  }
+  if (filters.arrivalFrom && filters.arrivalTo && filters.arrivalFrom > filters.arrivalTo) {
+    errors.arrivalTo = 'The end of the arrival time range must not be before its start.';
+  }
+
   if (Object.keys(errors).length > 0) return { errors };
-  return { page, limit };
+  return { page, limit, filters };
 }
 
 // Approximate arrival as already calculated and stored (never recalculated):

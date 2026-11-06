@@ -36,20 +36,20 @@ const call = (path, options) => request(baseUrl, path, options);
 const discover = (query = '', user = viewer) => call(`/api/v1/discover${query}`, { cookie: user?.token });
 
 // A surfer created directly, with private details that must never leak
-async function surfer(name, availability, { withProfile = true, updatedAt } = {}) {
+async function surfer(name, availability, { withProfile = true, updatedAt, skillLevel = 'intermediate', favoriteSpot = SUPERTUBOS } = {}) {
   counter += 1;
   const user = await User.create({ email: testEmail(`discover-${counter}`), passwordHash: 'not-a-real-hash' });
   if (withProfile) {
     await SurferProfile.create({
       userId: user.id,
       displayName: name,
-      skillLevel: 'intermediate',
+      skillLevel,
       boardType: 'fish',
       about: 'Private bio text',
       avatarUrl: 'https://res.cloudinary.com/sesh/image/upload/v1/sesh/avatars/abc.jpg',
       avatarPublicId: 'sesh/avatars/private-public-id',
     });
-    await FavoriteSpot.create({ userId: user.id, spotId: SUPERTUBOS });
+    await FavoriteSpot.create({ userId: user.id, spotId: favoriteSpot });
   }
   if (availability) {
     await SurferAvailability.create({ userId: user.id, ...availability });
@@ -345,8 +345,265 @@ describe('pagination and order', () => {
 });
 
 test('parseDiscoverQuery (unit)', () => {
-  assert.deepEqual(parseDiscoverQuery({}), { page: 1, limit: 20 });
-  assert.deepEqual(parseDiscoverQuery({ page: '3', limit: '50' }), { page: 3, limit: 50 });
+  assert.deepEqual(parseDiscoverQuery({}), { page: 1, limit: 20, filters: {} });
+  assert.deepEqual(parseDiscoverQuery({ page: '3', limit: '50' }), { page: 3, limit: 50, filters: {} });
   assert.ok(parseDiscoverQuery({ page: '9999999999' }).errors.page); // absurdly large
   assert.ok(parseDiscoverQuery({ limit: ['10', '20'] }).errors.limit);
+});
+
+// ---------------------------------------------------------------- Task 8.2
+// Filters. NOW is 10:00 UTC = 11:00 Lisbon (summer). Windows start on
+// Lisbon hours: 13:00 Lisbon = 12:00 UTC, 17:00 Lisbon = 16:00 UTC.
+
+const ids = (response) => response.body.surfers.map((card) => card.userId).sort();
+const sorted = (...people) => people.map((person) => person.id).sort();
+const at = (iso) => new Date(iso);
+const relativeAt = (iso, spotId = CARCAVELOS) => ({
+  status: 'coming_soon',
+  spotId,
+  arrivalType: 'relative',
+  arrivalOffsetMinutes: 60,
+  arrivalAt: at(iso),
+  expiresAt: new Date(at(iso).getTime() + HOUR),
+});
+const windowFrom = (startIso, spotId = GUINCHO) => ({
+  status: 'coming_soon',
+  spotId,
+  arrivalType: 'window',
+  windowStartsAt: at(startIso),
+  windowEndsAt: new Date(at(startIso).getTime() + 2 * HOUR),
+  expiresAt: new Date(at(startIso).getTime() + 3 * HOUR),
+});
+const q = (params) => `?${new URLSearchParams(params)}`;
+
+describe('filter: spotId (current availability spot)', () => {
+  test('matches Coming Soon, At the Spot and Active preferred spots; Active without a spot only without the filter', async () => {
+    const activeNoSpot = await surfer('Active no spot', ACTIVE);
+    const activeCarcavelos = await surfer('Active Carcavelos', ACTIVE_AT(CARCAVELOS));
+    const comingCarcavelos = await surfer('Coming Carcavelos', RELATIVE); // Carcavelos
+    const atGuincho = await surfer('At Guincho', AT_SPOT); // Guincho
+    // Favourite spot Carcavelos, but currently at Guincho: favourites don't count
+    const favouriteOnly = await surfer('Favourite Carcavelos', AT_SPOT, { favoriteSpot: CARCAVELOS });
+
+    assert.deepEqual(ids(await discover(q({ spotId: CARCAVELOS }))), sorted(activeCarcavelos, comingCarcavelos));
+    assert.deepEqual(ids(await discover(q({ spotId: GUINCHO }))), sorted(atGuincho, favouriteOnly));
+    assert.deepEqual((await discover(q({ spotId: SUPERTUBOS }))).body.surfers, []); // everyone's favourite, nobody's spot
+    assert.deepEqual(ids(await discover()), sorted(activeNoSpot, activeCarcavelos, comingCarcavelos, atGuincho, favouriteOnly));
+  });
+
+  test('an unknown or malformed spot id is a 400', async () => {
+    for (const [spotId, label] of [['pt-nowhere', 'unknown'], ['Praia de Carcavelos', 'name instead of id'], ['x'.repeat(101), 'too long']]) {
+      const response = await discover(q({ spotId }));
+      assert.equal(response.status, 400, label);
+      assert.equal(response.body.errors.spotId, 'Choose a surf spot from the list.');
+    }
+  });
+});
+
+describe('filter: skillLevel (profile level)', () => {
+  test('each level returns only surfers with that profile level', async () => {
+    const people = {
+      beginner: await surfer('Beginner', ACTIVE, { skillLevel: 'beginner' }),
+      intermediate: await surfer('Intermediate', ACTIVE, { skillLevel: 'intermediate' }),
+      advanced: await surfer('Advanced', ACTIVE, { skillLevel: 'advanced' }),
+    };
+    for (const [level, person] of Object.entries(people)) {
+      const response = await discover(q({ skillLevel: level }));
+      assert.deepEqual(ids(response), [person.id], level);
+      assert.equal(response.body.surfers[0].skillLevel, level);
+    }
+  });
+
+  test('invalid levels are a 400 (values are lowercase, as stored)', async () => {
+    for (const skillLevel of ['expert', 'Beginner', 'INTERMEDIATE', '']) {
+      const response = await discover(q({ skillLevel }));
+      assert.equal(response.status, 400, skillLevel);
+      assert.equal(response.body.errors.skillLevel, 'Skill level must be one of: beginner, intermediate, advanced.');
+    }
+  });
+});
+
+describe('filter: status', () => {
+  test('each discoverable status; Off and expired never appear', async () => {
+    const active = await surfer('Active', ACTIVE);
+    const coming = await surfer('Coming', RELATIVE);
+    const atSpot = await surfer('At spot', AT_SPOT);
+    await surfer('Off', OFF);
+    await surfer('Expired coming', { ...RELATIVE, expiresAt: NOW });
+    await surfer('Expired at spot', { ...AT_SPOT, expiresAt: new Date(NOW.getTime() - 1) });
+
+    assert.deepEqual(ids(await discover(q({ status: 'ACTIVE' }))), [active.id]);
+    assert.deepEqual(ids(await discover(q({ status: 'COMING_SOON' }))), [coming.id]);
+    assert.deepEqual(ids(await discover(q({ status: 'AT_SPOT' }))), [atSpot.id]);
+  });
+
+  test('invalid statuses are a 400 (OFF is never searchable)', async () => {
+    for (const status of ['OFF', 'active', 'AT_THE_SPOT', 'INVISIBLE']) {
+      const response = await discover(q({ status }));
+      assert.equal(response.status, 400, status);
+      assert.equal(response.body.errors.status, 'Status must be one of: ACTIVE, COMING_SOON, AT_SPOT.');
+    }
+  });
+});
+
+describe('filter: arrival time range (Coming Soon only)', () => {
+  // R11 arrives 11:00Z, R1130 at 11:30Z; W12 is 12:00–14:00Z, W16 is 16:00–18:00Z
+  async function arrivals() {
+    return {
+      r11: await surfer('Relative 11:00', relativeAt('2030-07-15T11:00:00Z')),
+      r1130: await surfer('Relative 11:30', relativeAt('2030-07-15T11:30:00Z')),
+      w12: await surfer('Window 12-14', windowFrom('2030-07-15T12:00:00Z')),
+      w16: await surfer('Window 16-18', windowFrom('2030-07-15T16:00:00Z')),
+      active: await surfer('Active', ACTIVE),
+      atSpot: await surfer('At spot', AT_SPOT),
+    };
+  }
+  const range = (from, to) => q({ ...(from && { arrivalFrom: from }), ...(to && { arrivalTo: to }) });
+
+  test('relative arrivals: inside the range (inclusive) or not', async () => {
+    const p = await arrivals();
+    assert.deepEqual(ids(await discover(range('2030-07-15T10:45:00Z', '2030-07-15T11:15:00Z'))), [p.r11.id]);
+    assert.deepEqual(ids(await discover(range('2030-07-15T11:00:00Z', '2030-07-15T11:30:00Z'))), sorted(p.r11, p.r1130)); // both ends inclusive
+    assert.deepEqual(ids(await discover(range('2030-07-15T11:00:01Z', '2030-07-15T11:29:59Z'))), []);
+  });
+
+  test('windows: included when they overlap the range, touching edges included', async () => {
+    const p = await arrivals();
+    assert.deepEqual(ids(await discover(range('2030-07-15T13:00:00Z', '2030-07-15T13:30:00Z'))), [p.w12.id]); // inside
+    assert.deepEqual(ids(await discover(range('2030-07-15T11:45:00Z', '2030-07-15T12:15:00Z'))), [p.w12.id]); // overlaps start
+    assert.deepEqual(ids(await discover(range('2030-07-15T14:00:00Z', '2030-07-15T16:00:00Z'))), sorted(p.w12, p.w16)); // touches both
+    assert.deepEqual(ids(await discover(range('2030-07-15T14:00:01Z', '2030-07-15T15:59:59Z'))), []); // in between
+  });
+
+  test('a zero-length range is a point in time', async () => {
+    const p = await arrivals();
+    assert.deepEqual(ids(await discover(range('2030-07-15T11:30:00Z', '2030-07-15T11:30:00Z'))), [p.r1130.id]);
+    assert.deepEqual(ids(await discover(range('2030-07-15T13:00:00Z', '2030-07-15T13:00:00Z'))), [p.w12.id]);
+  });
+
+  test('one-sided ranges', async () => {
+    const p = await arrivals();
+    // From 12:30: everything arriving / in a window that ends at or after 12:30
+    assert.deepEqual(ids(await discover(range('2030-07-15T12:30:00Z'))), sorted(p.w12, p.w16));
+    // Until 11:30: arrivals at or before 11:30 and windows starting by then
+    assert.deepEqual(ids(await discover(range(null, '2030-07-15T11:30:00Z'))), sorted(p.r11, p.r1130));
+    // Until 16:00: the 16:00 window starts exactly then (inclusive)
+    assert.deepEqual(ids(await discover(range(null, '2030-07-15T16:00:00Z'))), sorted(p.r11, p.r1130, p.w12, p.w16));
+  });
+
+  test('Active and At the Spot never match an arrival range; combining them with it gives an empty result', async () => {
+    const p = await arrivals();
+    const wide = range('2030-07-15T00:00:00Z', '2030-07-15T23:59:59Z');
+    assert.deepEqual(ids(await discover(wide)), sorted(p.r11, p.r1130, p.w12, p.w16));
+    for (const status of ['ACTIVE', 'AT_SPOT']) {
+      const response = await discover(`${wide}&status=${status}`);
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body, { surfers: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+    }
+    assert.deepEqual(ids(await discover(`${wide}&status=COMING_SOON`)), sorted(p.r11, p.r1130, p.w12, p.w16));
+  });
+
+  test('offsets other than Z are accepted and compared as instants', async () => {
+    const p = await arrivals();
+    // 12:00+01:00 = 11:00Z
+    const response = await discover(range('2030-07-15T11:45:00+01:00', '2030-07-15T12:15:00+01:00'));
+    assert.deepEqual(ids(response), [p.r11.id]);
+  });
+
+  test('invalid timestamps and reversed ranges are a 400', async () => {
+    for (const [params, field] of [
+      [{ arrivalFrom: 'tomorrow' }, 'arrivalFrom'],
+      [{ arrivalFrom: '2030-07-15' }, 'arrivalFrom'],
+      [{ arrivalFrom: '2030-07-15T10:00:00' }, 'arrivalFrom'], // no time zone
+      [{ arrivalTo: '2030-02-30T10:00:00Z' }, 'arrivalTo'], // no such day
+      [{ arrivalTo: '2030-07-15T24:00:00Z' }, 'arrivalTo'],
+      [{ arrivalFrom: '1794009600000' }, 'arrivalFrom'], // epoch milliseconds
+      [{ arrivalFrom: '2030-07-15T12:00:00Z', arrivalTo: '2030-07-15T11:59:59Z' }, 'arrivalTo'], // reversed
+    ]) {
+      const response = await discover(q(params));
+      assert.equal(response.status, 400, JSON.stringify(params));
+      assert.ok(response.body.errors[field], `${JSON.stringify(params)}: ${JSON.stringify(response.body.errors)}`);
+    }
+    const repeated = await discover('?arrivalFrom=2030-07-15T10:00:00Z&arrivalFrom=2030-07-15T11:00:00Z');
+    assert.equal(repeated.status, 400);
+    assert.ok(repeated.body.errors.arrivalFrom);
+  });
+});
+
+describe('combined filters (AND)', () => {
+  async function mix() {
+    return {
+      // Intermediate, Coming Soon to Carcavelos, arriving 11:00Z
+      target: await surfer('Target', relativeAt('2030-07-15T11:00:00Z', CARCAVELOS)),
+      // Same but beginner
+      beginnerComing: await surfer('Beginner coming', relativeAt('2030-07-15T11:00:00Z', CARCAVELOS), { skillLevel: 'beginner' }),
+      // Intermediate, Coming Soon to Guincho
+      otherSpot: await surfer('Other spot', relativeAt('2030-07-15T11:00:00Z', GUINCHO)),
+      // Intermediate, Active preferring Carcavelos
+      activeHere: await surfer('Active here', ACTIVE_AT(CARCAVELOS)),
+      // Intermediate, Coming Soon to Carcavelos but arriving later (17:00 window)
+      later: await surfer('Later', windowFrom('2030-07-15T16:00:00Z', CARCAVELOS)),
+      // Beginner, Active without spot
+      beginnerActive: await surfer('Beginner active', ACTIVE, { skillLevel: 'beginner' }),
+    };
+  }
+
+  test('spot + skill, spot + status, skill + status', async () => {
+    const p = await mix();
+    assert.deepEqual(ids(await discover(q({ spotId: CARCAVELOS, skillLevel: 'intermediate' }))), sorted(p.target, p.activeHere, p.later));
+    assert.deepEqual(ids(await discover(q({ spotId: CARCAVELOS, status: 'COMING_SOON' }))), sorted(p.target, p.beginnerComing, p.later));
+    assert.deepEqual(ids(await discover(q({ skillLevel: 'beginner', status: 'ACTIVE' }))), [p.beginnerActive.id]);
+  });
+
+  test('status + arrival, and all filters together', async () => {
+    const p = await mix();
+    const morning = { arrivalFrom: '2030-07-15T10:30:00Z', arrivalTo: '2030-07-15T11:30:00Z' };
+    assert.deepEqual(ids(await discover(q({ status: 'COMING_SOON', ...morning }))), sorted(p.target, p.beginnerComing, p.otherSpot));
+    const all = await discover(q({ spotId: CARCAVELOS, skillLevel: 'intermediate', status: 'COMING_SOON', ...morning, page: '1', limit: '20' }));
+    assert.equal(all.status, 200);
+    assert.deepEqual(ids(all), [p.target.id]);
+    assert.deepEqual(all.body.pagination, { page: 1, limit: 20, total: 1, totalPages: 1 });
+  });
+
+  test('filtered cards keep the exact public shape and leak nothing', async () => {
+    await mix();
+    const response = await discover(q({ spotId: CARCAVELOS, skillLevel: 'intermediate' }));
+    for (const card of response.body.surfers) {
+      assert.deepEqual(Object.keys(card).sort(), CARD_KEYS);
+      assert.deepEqual(Object.keys(card.availability).sort(), AVAILABILITY_KEYS);
+    }
+    for (const secret of ['Private bio text', 'fish', 'private-public-id', 'expires', 'not-a-real-hash', '@sesh-test.invalid', 'favoriteSpots']) {
+      assert.ok(!response.text.includes(secret), secret);
+    }
+  });
+});
+
+describe('filters with pagination', () => {
+  test('filters apply before paging: totals, pages and order describe the filtered set', async () => {
+    const matching = [];
+    for (let i = 0; i < 5; i += 1) {
+      matching.push(await surfer(`Match ${i}`, ACTIVE_AT(CARCAVELOS), { updatedAt: new Date(NOW.getTime() - (i + 1) * MINUTE) }));
+      // Interleaved non-matching surfers (other level), newer than each match
+      await surfer(`Other ${i}`, ACTIVE_AT(CARCAVELOS), { skillLevel: 'advanced', updatedAt: new Date(NOW.getTime() - i * MINUTE - 30 * 1000) });
+    }
+
+    const seen = [];
+    for (const page of [1, 2, 3]) {
+      const response = await discover(q({ spotId: CARCAVELOS, skillLevel: 'intermediate', page: String(page), limit: '2' }));
+      assert.deepEqual(response.body.pagination, { page, limit: 2, total: 5, totalPages: 3 });
+      seen.push(...response.body.surfers.map((card) => card.userId));
+    }
+    assert.deepEqual(seen, matching.map((person) => person.id)); // newest first, each once
+    assert.equal(new Set(seen).size, 5);
+    // Unfiltered, all ten are there
+    assert.equal((await discover(q({ spotId: CARCAVELOS }))).body.pagination.total, 10);
+  });
+
+  test('no filters still behaves exactly as before', async () => {
+    const a = await surfer('A', ACTIVE, { updatedAt: new Date(NOW.getTime() - MINUTE) });
+    const b = await surfer('B', RELATIVE, { updatedAt: new Date(NOW.getTime() - 2 * MINUTE) });
+    const response = await discover();
+    assert.deepEqual(response.body.surfers.map((card) => card.userId), [a.id, b.id]);
+    assert.deepEqual(response.body.pagination, { page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
 });

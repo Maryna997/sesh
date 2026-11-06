@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import AuthPageLayout from '../components/auth/AuthPageLayout'
 import discoverImage from '../assets/hero-ocean.jpg'
 import DiscoverFilters from '../components/discover/DiscoverFilters'
@@ -22,6 +22,14 @@ function DiscoverPage() {
   const spots = useSurfSpots()
   const results = useDiscoverSurfers(filters)
   const duplicateNames = useMemo(() => duplicateSpotNames(spots.list), [spots.list])
+  const resultsRef = useRef(null)
+
+  // All four filters back to their defaults (a new, unfiltered search).
+  // Focus moves to the results, because the clicked button disappears.
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS)
+    resultsRef.current?.focus()
+  }
 
   return (
     <AuthPageLayout
@@ -35,8 +43,9 @@ function DiscoverPage() {
         <DiscoverResults
           results={results}
           filtered={hasActiveFilters(filters)}
-          onClearFilters={() => setFilters(DEFAULT_FILTERS)}
+          onClearFilters={clearFilters}
           duplicateNames={duplicateNames}
+          regionRef={resultsRef}
         />
       </div>
     </AuthPageLayout>

@@ -43,8 +43,9 @@ function DiscoverFilters({ filters, onChange, spots, duplicateNames }) {
         {spots.status === 'error' && (
           <div className="mt-3">
             <Alert>We couldn’t load the surf spots. You can still search all spots.</Alert>
+            {/* Named apart from the results' "Try again" */}
             <Button variant="outline" size="sm" className="mt-3" onClick={spots.retry}>
-              Try again
+              Reload surf spots
             </Button>
           </div>
         )}

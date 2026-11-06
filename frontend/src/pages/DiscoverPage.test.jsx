@@ -7,6 +7,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { jsonResponse, renderApp, responses } from '../test/utils'
+import { NO_MATCHES_TITLE, NO_SURFERS_TITLE } from '../components/discover/DiscoverResults'
+import { PROFILE_REQUIRED_MESSAGE } from '../hooks/useDiscoverSurfers'
 
 const CARCAVELOS = { id: 'pt-cascais-carcavelos', name: 'Carcavelos', kind: 'beach', area: 'Carcavelos', municipality: 'Cascais', region: 'Lisbon', country: 'Portugal' }
 const GUINCHO = { id: 'pt-cascais-guincho', name: 'Guincho', kind: 'beach', area: 'Cascais', municipality: 'Cascais', region: 'Lisbon', country: 'Portugal' }
@@ -71,7 +73,10 @@ const cardNames = () => within(screen.getByRole('list', { name: 'Available surfe
 const field = (label) => screen.getByLabelText(label)
 const arrivalField = () => screen.queryByLabelText('Approximate arrival')
 // The Discover results count (the spot field has its own screen-reader status)
-const resultCount = () => screen.getByText(/surfers? available/)
+const resultCount = () => screen.getByText(/surfers? available/, { selector: '[aria-hidden="true"]' })
+// Texts of the screen-reader status regions (Discover's and the spot field's)
+const announced = () => screen.getAllByRole('status').map((region) => region.textContent)
+const resultsRegion = () => screen.getByRole('region', { name: 'Search results' })
 // Suggestions of the surf spot field (not the <option>s of the other filters)
 const spotOptions = () => within(screen.getByRole('listbox')).getAllByRole('option')
 
@@ -295,7 +300,7 @@ describe('filters', () => {
     expect(field('Surf spot').disabled).toBe(true)
 
     spotsFail = false
-    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('button', { name: 'Reload surf spots' }))
     await waitFor(() => expect(field('Surf spot').disabled).toBe(false))
     await user.click(field('Surf spot'))
     expect(spotOptions()).toHaveLength(5) // All spots + 4
@@ -531,9 +536,18 @@ describe('states', () => {
     const slow = deferred()
     mockBackend({ discover: () => slow.promise })
     renderApp('/discover')
-    expect((await screen.findByText('Finding surfers…')).getAttribute('role')).toBe('status')
+    await screen.findByRole('heading', { name: 'Available surfers' })
+    // Visible message, announced once by the status region, filters usable
+    expect(screen.getByText('Finding surfers…', { selector: '[aria-hidden="true"]' })).toBeTruthy()
+    expect(announced()).toContain('Finding surfers…')
+    expect(resultsRegion().getAttribute('aria-busy')).toBe('true')
+    expect(field('Skill level').disabled).toBe(false)
+    expect(screen.queryByRole('heading', { name: NO_SURFERS_TITLE })).toBeNull()
+
     slow.resolve(page([MARIANA]))
     expect(await results()).toBeTruthy()
+    expect(resultsRegion().getAttribute('aria-busy')).toBe('false')
+    expect(announced()).toContain('1 surfer available')
   })
 
   test('nobody available (no filters): invites the user to set a status', async () => {
@@ -600,5 +614,245 @@ describe('states', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(cardNames()).toEqual(['Mariana Silva', 'Noa Reis']))
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+// Task 8.4: refined states, races and session handling
+describe('loading after a filter change', () => {
+  test('old cards disappear at once; loading, never an empty state, until the new answer', async () => {
+    const user = userEvent.setup()
+    const next = deferred()
+    await openDiscover({ discover: (params) => (params.status ? next.promise : page([MARIANA, LUCAS])) })
+    await results()
+
+    await user.selectOptions(field('Availability'), 'AT_SPOT')
+    expect(screen.queryByRole('list', { name: 'Available surfers' })).toBeNull()
+    expect(screen.queryByText('Mariana Silva')).toBeNull()
+    expect(announced()).toContain('Finding surfers…')
+    expect(resultsRegion().getAttribute('aria-busy')).toBe('true')
+    expect(screen.queryByRole('heading', { name: NO_MATCHES_TITLE })).toBeNull()
+
+    next.resolve(page([JAMIE]))
+    await waitFor(() => expect(cardNames()).toEqual(['Jamie Lee']))
+  })
+
+  test('a search that finds nobody after an earlier success shows the filtered empty state, no old cards', async () => {
+    const user = userEvent.setup()
+    await openDiscover({ discover: (params) => page(params.skillLevel ? [] : [MARIANA]) })
+    await results()
+    await user.selectOptions(field('Skill level'), 'advanced')
+    expect(await screen.findByRole('heading', { name: NO_MATCHES_TITLE })).toBeTruthy()
+    expect(screen.queryByText('Mariana Silva')).toBeNull()
+    expect(announced()).toContain(NO_MATCHES_TITLE + '.')
+  })
+
+  test('no arrivals in the chosen interval: the filtered empty state, not "nobody available"', async () => {
+    const user = userEvent.setup()
+    await openDiscover({ discover: (params) => page(params.arrivalFrom ? [] : [LUCAS]) })
+    await user.selectOptions(field('Availability'), 'COMING_SOON')
+    await user.selectOptions(arrivalField(), 'within_1_hour')
+    expect(await screen.findByRole('heading', { name: NO_MATCHES_TITLE })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: NO_SURFERS_TITLE })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy()
+  })
+})
+
+describe('empty-state actions', () => {
+  test('Clear filters (keyboard) resets all four filters, searches again and keeps focus in the results', async () => {
+    const user = userEvent.setup()
+    const fetchMock = await openDiscover({ discover: (params) => page(Object.keys(params).length ? [] : [MARIANA]) })
+    await chooseSpot(user, 'carc', /^Carcavelos/)
+    await user.selectOptions(field('Skill level'), 'beginner')
+    await user.selectOptions(field('Availability'), 'COMING_SOON')
+    await user.selectOptions(arrivalField(), 'within_2_hours')
+    const clear = await screen.findByRole('button', { name: 'Clear filters' })
+
+    clear.focus()
+    await user.keyboard('{Enter}')
+    expect(field('Surf spot').value).toBe('')
+    expect(field('Skill level').value).toBe('')
+    expect(field('Availability').value).toBe('')
+    expect(arrivalField()).toBeNull()
+    expect(document.activeElement).toBe(resultsRegion())
+    await waitFor(() => expect(cardNames()).toEqual(['Mariana Silva']))
+    expect(discoverCalls(fetchMock).at(-1)).toEqual({})
+
+    // Coming Soon again starts from "Any time today"
+    await user.selectOptions(field('Availability'), 'COMING_SOON')
+    expect(arrivalField().value).toBe('any')
+  })
+
+  test('Set my status opens My Status', async () => {
+    const user = userEvent.setup()
+    await openDiscover({ discover: () => page([]) })
+    await user.click(await screen.findByRole('link', { name: 'Set my status' }))
+    expect(location()).toBe('/status')
+  })
+})
+
+describe('errors and retry', () => {
+  test('server details are never shown; Try again (keyboard) keeps the filters and focus', async () => {
+    const user = userEvent.setup()
+    let fail = true
+    const fetchMock = await openDiscover({
+      discover: () =>
+        fail ? jsonResponse(500, { status: 'error', message: 'SequelizeDatabaseError: relation "surfer_availability" at line 42' }) : page([MARIANA]),
+    })
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).not.toMatch(/Sequelize|relation|line 42/)
+    expect(screen.queryByRole('heading', { name: NO_SURFERS_TITLE })).toBeNull() // not an empty state
+
+    await user.selectOptions(field('Skill level'), 'beginner')
+    await screen.findByRole('alert')
+    fail = false
+    screen.getByRole('button', { name: 'Try again' }).focus()
+    await user.keyboard('{Enter}')
+    expect(document.activeElement).toBe(resultsRegion())
+    await waitFor(() => expect(cardNames()).toEqual(['Mariana Silva']))
+    expect(discoverCalls(fetchMock).at(-1)).toEqual({ skillLevel: 'beginner' })
+  })
+})
+
+describe('Load more states', () => {
+  test('while the next page loads: cards stay, button shows "Loading more…" and is disabled', async () => {
+    const user = userEvent.setup()
+    const next = deferred()
+    await openDiscover({ discover: (params) => (params.page === '2' ? next.promise : page([MARIANA], { total: 2, totalPages: 2 })) })
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+    const button = screen.getByRole('button', { name: /Loading more…/ })
+    expect(button.disabled).toBe(true)
+    expect(cardNames()).toEqual(['Mariana Silva'])
+    expect(announced()).toContain('Loading more surfers…')
+    expect(resultsRegion().getAttribute('aria-busy')).toBe('false') // the list itself is not reloading
+
+    next.resolve(page([NOA], { page: 2, total: 2, totalPages: 2 }))
+    await waitFor(() => expect(cardNames()).toEqual(['Mariana Silva', 'Noa Reis']))
+    expect(announced()).toContain('2 surfers available')
+  })
+
+  test('retrying a failed page asks for the same page with the same arrival bounds', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-06T14:10:00.000Z') })
+    const user = userEvent.setup()
+    let failPage2 = true
+    const fetchMock = await openDiscover({
+      discover: (params) => {
+        if (params.page === '2') return failPage2 ? responses.serverError() : page([EMMA], { page: 2, total: 2, totalPages: 2 })
+        return page([LUCAS], { total: 2, totalPages: 2 })
+      },
+    })
+    await user.selectOptions(field('Availability'), 'COMING_SOON')
+    await user.selectOptions(arrivalField(), 'within_1_hour')
+    await waitFor(() => expect(cardNames()).toEqual(['Lucas Costa']))
+    const firstPage = discoverCalls(fetchMock).at(-1)
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('We couldn’t load more surfers')
+    vi.setSystemTime(new Date('2026-11-06T14:25:00.000Z')) // time passes before the retry
+    failPage2 = false
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(cardNames()).toEqual(['Lucas Costa', 'Emma Laurent']))
+
+    const pageCalls = discoverCalls(fetchMock).filter((params) => params.page === '2')
+    expect(pageCalls).toHaveLength(2)
+    for (const call of pageCalls) expect(call).toEqual({ ...firstPage, page: '2' })
+  })
+})
+
+describe('race conditions', () => {
+  test('rapid status changes with answers out of order: only the latest search is shown', async () => {
+    const user = userEvent.setup()
+    const answers = { COMING_SOON: deferred(), AT_SPOT: deferred() }
+    await openDiscover({ discover: (params) => (params.status ? answers[params.status].promise : page([MARIANA])) })
+    await results()
+
+    await user.selectOptions(field('Availability'), 'COMING_SOON')
+    await user.selectOptions(field('Availability'), 'AT_SPOT')
+    answers.AT_SPOT.resolve(page([JAMIE]))
+    await waitFor(() => expect(cardNames()).toEqual(['Jamie Lee']))
+    answers.COMING_SOON.resolve(page([LUCAS, EMMA]))
+    await new Promise((done) => setTimeout(done, 50))
+    expect(cardNames()).toEqual(['Jamie Lee'])
+  })
+
+  test('rapid spot changes: All spots → Carcavelos → Guincho', async () => {
+    const user = userEvent.setup()
+    const carcavelos = deferred()
+    await openDiscover({
+      discover: (params) =>
+        params.spotId === 'pt-cascais-carcavelos' ? carcavelos.promise : params.spotId ? page([LUCAS]) : page([MARIANA]),
+    })
+    await results()
+    await chooseSpot(user, 'carc', /^Carcavelos/)
+    await chooseSpot(user, 'guin', /^Guincho/)
+    await waitFor(() => expect(cardNames()).toEqual(['Lucas Costa']))
+    carcavelos.resolve(page([MARIANA, EMMA]))
+    await new Promise((done) => setTimeout(done, 50))
+    expect(cardNames()).toEqual(['Lucas Costa'])
+  })
+
+  test('an older search failing late does not replace newer results', async () => {
+    const user = userEvent.setup()
+    const slowFailure = deferred()
+    await openDiscover({
+      discover: (params) => (params.skillLevel === 'beginner' ? slowFailure.promise : page(params.skillLevel ? [JAMIE] : [MARIANA])),
+    })
+    await results()
+    await user.selectOptions(field('Skill level'), 'beginner')
+    await user.selectOptions(field('Skill level'), 'advanced')
+    await waitFor(() => expect(cardNames()).toEqual(['Jamie Lee']))
+
+    slowFailure.resolve(responses.serverError())
+    await new Promise((done) => setTimeout(done, 50))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(cardNames()).toEqual(['Jamie Lee'])
+  })
+
+  test('a filter change while Load more runs: the old page is never appended', async () => {
+    const user = userEvent.setup()
+    const page2 = deferred()
+    await openDiscover({
+      discover: (params) => {
+        if (params.page === '2') return page2.promise
+        return params.skillLevel ? page([JAMIE]) : page([MARIANA], { total: 2, totalPages: 2 })
+      },
+    })
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+    await user.selectOptions(field('Skill level'), 'advanced')
+    await waitFor(() => expect(cardNames()).toEqual(['Jamie Lee']))
+
+    page2.resolve(page([NOA], { page: 2, total: 2, totalPages: 2 }))
+    await new Promise((done) => setTimeout(done, 50))
+    expect(cardNames()).toEqual(['Jamie Lee'])
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Load more|Loading more/ })).toBeNull()
+  })
+})
+
+describe('session and profile', () => {
+  test('401 while the session still looks valid: a clear message, one check, no retry loop', async () => {
+    const fetchMock = mockBackend({ discover: () => jsonResponse(401, { status: 'error', message: 'Authentication required.' }) })
+    renderApp('/discover')
+    expect((await screen.findByRole('alert')).textContent).toContain('Your session has ended. Please log in again.')
+    await new Promise((done) => setTimeout(done, 100))
+    const urls = fetchMock.mock.calls.map(([url]) => url)
+    expect(urls.filter((url) => url.startsWith('/api/v1/discover'))).toHaveLength(1)
+    expect(urls.filter((url) => url === '/api/v1/auth/me')).toHaveLength(2) // page load + one re-check
+  })
+
+  test('403 PROFILE_REQUIRED (profile gone): the onboarding guard takes over', async () => {
+    let hasProfile = true
+    mockBackend({
+      me: () => responses.signedIn(undefined, { hasCompletedProfile: hasProfile }),
+      discover: () => {
+        hasProfile = false
+        return jsonResponse(403, { status: 'error', message: 'Create your surfer profile first.', code: 'PROFILE_REQUIRED' })
+      },
+    })
+    renderApp('/discover')
+    await waitFor(() => expect(location()).toBe('/create-profile'))
+    expect(screen.queryByText(PROFILE_REQUIRED_MESSAGE)).toBeNull() // the page has moved on
   })
 })

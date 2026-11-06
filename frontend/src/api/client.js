@@ -16,12 +16,15 @@ export class ApiError extends Error {
   // kind: 'network'    - the request never got a response (offline, server down)
   //       'http'       - the server answered with an error status (400, 401, 409, 500...)
   //       'unexpected' - the response wasn't the JSON we expected
-  constructor(kind, { status = null, message = '', fieldErrors = null } = {}) {
+  // code: the server's machine-readable reason, when it sends one
+  //       (e.g. 'PROFILE_REQUIRED'); null otherwise
+  constructor(kind, { status = null, message = '', fieldErrors = null, code = null } = {}) {
     super(message || kind)
     this.name = 'ApiError'
     this.kind = kind
     this.status = status
     this.fieldErrors = fieldErrors
+    this.code = code
   }
 }
 
@@ -59,6 +62,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
       status: response.status,
       message: data?.message ?? '',
       fieldErrors: data?.errors ?? null,
+      code: typeof data?.code === 'string' ? data.code : null,
     })
   }
 

@@ -3,6 +3,7 @@
 // themselves; this covers everything else.
 export const NETWORK_ERROR_MESSAGE = 'We couldn’t reach Sesh. Check your connection and try again.'
 export const SERVER_ERROR_MESSAGE = 'Something went wrong on our side. Please try again in a moment.'
+export const SESSION_ENDED_MESSAGE = 'Your session has ended. Please log in again.'
 
 export function getRequestErrorMessage(error) {
   if (error?.kind === 'network') return NETWORK_ERROR_MESSAGE

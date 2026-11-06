@@ -33,6 +33,13 @@ describe('apiRequest', () => {
     })
   })
 
+  test('keeps the server error code when there is one', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(403, { status: 'error', message: 'Create your surfer profile first.', code: 'PROFILE_REQUIRED' })))
+    await expect(apiRequest('/discover')).rejects.toMatchObject({ kind: 'http', status: 403, code: 'PROFILE_REQUIRED' })
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(500, { status: 'error', message: 'Oops' })))
+    await expect(apiRequest('/discover')).rejects.toMatchObject({ code: null })
+  })
+
   test('non-JSON success (e.g. an HTML page) -> kind "unexpected"', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html><html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } })))
     await expect(apiRequest('/auth/me')).rejects.toMatchObject({ kind: 'unexpected' })

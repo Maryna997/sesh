@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDiscoverSurfers } from '../api/discover'
-import { getRequestErrorMessage } from '../api/errorMessages'
+import { getRequestErrorMessage, SESSION_ENDED_MESSAGE } from '../api/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { buildDiscoverQuery } from '../utils/discoverFilters'
+
+export const PROFILE_REQUIRED_MESSAGE = 'Finish your surfer profile to use Discover.'
 
 // Adds the surfers that aren't in the list yet (by userId), keeping order.
 // A surfer can move between pages while someone is browsing (offset
@@ -29,8 +31,8 @@ function appendNew(current, incoming) {
 //   same search.
 // - loadMore() appends the next page without duplicates; repeated calls
 //   while a page is loading are ignored.
-// - A 401 means the session ended: the auth state is refreshed, which sends
-//   the user to the login page.
+// - A 401 (session ended) or 403 PROFILE_REQUIRED refreshes the auth state,
+//   so the route guards send the user to log in or to Create Profile.
 //
 // Returns { status: 'loading' | 'ready' | 'error', surfers, total, hasMore,
 //           error, more: { status: 'idle' | 'loading' | 'error', error }, loadMore, retry }.
@@ -43,9 +45,22 @@ export function useDiscoverSurfers(filters) {
   const searchIdRef = useRef(0)
   const loadingMoreRef = useRef(false)
 
+  // A friendly message for a failed request (never the server's own text).
+  // An ended session (401) or a missing profile (403 PROFILE_REQUIRED) asks
+  // the server about the session again; the existing route guards then send
+  // the user to log in or to Create Profile. Nothing is retried
+  // automatically, so this can't loop.
   const errorMessage = useCallback(
     (error) => {
-      if (error?.kind === 'http' && error.status === 401) refreshSession()
+      const status = error?.kind === 'http' ? error.status : null
+      if (status === 401) {
+        refreshSession()
+        return SESSION_ENDED_MESSAGE
+      }
+      if (status === 403 && error.code === 'PROFILE_REQUIRED') {
+        refreshSession()
+        return PROFILE_REQUIRED_MESSAGE
+      }
       return getRequestErrorMessage(error)
     },
     [refreshSession],
@@ -55,12 +70,14 @@ export function useDiscoverSurfers(filters) {
     const searchId = ++searchIdRef.current
     loadingMoreRef.current = false
     const query = buildDiscoverQuery(filters, new Date())
-    const finish = (fields) => {
-      if (searchId === searchIdRef.current) setResult({ searchId, filters, attempt, query, ...fields })
-    }
+    const isLatest = () => searchId === searchIdRef.current
+    const finish = (fields) => setResult({ searchId, filters, attempt, query, ...fields })
+    // Answers (successes and failures) of an older search are ignored
     getDiscoverSurfers(query).then(
-      (data) => finish({ status: 'ready', surfers: appendNew([], data.surfers), pagination: data.pagination ?? null, error: null }),
-      (error) => finish({ status: 'error', surfers: [], pagination: null, error: errorMessage(error) }),
+      (data) =>
+        isLatest() &&
+        finish({ status: 'ready', surfers: appendNew([], data.surfers), pagination: data.pagination ?? null, error: null }),
+      (error) => isLatest() && finish({ status: 'error', surfers: [], pagination: null, error: errorMessage(error) }),
     )
   }, [filters, attempt, errorMessage])
 

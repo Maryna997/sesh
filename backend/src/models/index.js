@@ -6,6 +6,8 @@ import { SurfSpot } from './SurfSpot.js';
 import { SurferProfile } from './SurferProfile.js';
 import { FavoriteSpot } from './FavoriteSpot.js';
 import { SurferAvailability } from './SurferAvailability.js';
+import { Conversation } from './Conversation.js';
+import { Message } from './Message.js';
 
 // A user has zero or one surfer profile
 User.hasOne(SurferProfile, { foreignKey: 'userId', as: 'surferProfile' });
@@ -37,4 +39,17 @@ SurfSpot.hasMany(SurferAvailability, { foreignKey: 'spotId', as: 'availabilities
 // (no database constraint between them: both belong to the user)
 SurferAvailability.belongsTo(SurferProfile, { foreignKey: 'userId', targetKey: 'userId', as: 'profile', constraints: false });
 
-export { User, Session, SurfSpot, SurferProfile, FavoriteSpot, SurferAvailability };
+// Private messaging: a conversation has exactly two participants (userOne,
+// userTwo, canonical order) and many messages; each message has one sender.
+// "A user's conversations" are those where they are userOne OR userTwo (see
+// participantWhere in Conversation.js), so there are two aliases on User.
+Conversation.belongsTo(User, { foreignKey: 'userOneId', as: 'userOne' });
+Conversation.belongsTo(User, { foreignKey: 'userTwoId', as: 'userTwo' });
+User.hasMany(Conversation, { foreignKey: 'userOneId', as: 'conversationsAsUserOne' });
+User.hasMany(Conversation, { foreignKey: 'userTwoId', as: 'conversationsAsUserTwo' });
+Conversation.hasMany(Message, { foreignKey: 'conversationId', as: 'messages' });
+Message.belongsTo(Conversation, { foreignKey: 'conversationId', as: 'conversation' });
+Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
+User.hasMany(Message, { foreignKey: 'senderId', as: 'sentMessages' });
+
+export { User, Session, SurfSpot, SurferProfile, FavoriteSpot, SurferAvailability, Conversation, Message };

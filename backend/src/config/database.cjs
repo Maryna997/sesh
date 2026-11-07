@@ -39,9 +39,14 @@ module.exports = {
   development: config,
   // Tests use TEST_DATABASE_URL when it is set (a separate database, so tests
   // never touch real data); otherwise they fall back to DATABASE_URL.
+  //
+  // TEST_DATABASE_SSL=false (only together with TEST_DATABASE_URL) is for an
+  // isolated database on this computer, e.g. a throwaway local PostgreSQL,
+  // which has no TLS. Every other connection always uses verified TLS.
   test: {
     ...config,
     use_env_variable: process.env.TEST_DATABASE_URL ? 'TEST_DATABASE_URL' : 'DATABASE_URL',
+    ...(process.env.TEST_DATABASE_URL && process.env.TEST_DATABASE_SSL === 'false' && { dialectOptions: {} }),
   },
   production: config,
 };

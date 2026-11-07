@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router'
+import SectionNavLink from './SectionNavLink'
 import { topNavItems } from '../../config/navigation'
 import AccountMenu from './AccountMenu'
 
@@ -16,8 +16,9 @@ function TopNav() {
       <ul className="grid w-[305px] grid-cols-4 text-center text-xs lg:flex lg:w-auto lg:items-center lg:gap-9 lg:text-sm">
         {topNavItems.map((item) => (
           <li key={item.to}>
-            <NavLink
+            <SectionNavLink
               to={item.to}
+              sectionPaths={item.sectionPaths}
               className={({ isActive }) =>
                 [
                   'block rounded-md px-1 py-2 text-ink underline-offset-8 transition-colors',
@@ -34,7 +35,7 @@ function TopNav() {
                   {item.label}
                 </span>
               </span>
-            </NavLink>
+            </SectionNavLink>
           </li>
         ))}
         <li>

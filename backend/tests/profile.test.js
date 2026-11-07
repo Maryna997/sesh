@@ -24,7 +24,7 @@ const SUPERTUBOS = 'pt-peniche-supertubos';
 const PRAIA_GRANDE = 'pt-sintra-praia-grande';
 const VALID_PROFILE = { displayName: 'Kai Silva', skillLevel: 'intermediate' };
 const OWN_PROFILE_KEYS = ['about', 'avatarUrl', 'boardType', 'createdAt', 'displayName', 'favoriteSpots', 'skillLevel', 'updatedAt', 'userId'];
-const PUBLIC_PROFILE_KEYS = ['about', 'avatarUrl', 'boardType', 'displayName', 'favoriteSpots', 'skillLevel', 'userId'];
+const PUBLIC_PROFILE_KEYS = ['about', 'availability', 'avatarUrl', 'boardType', 'displayName', 'favoriteSpots', 'skillLevel', 'userId'];
 
 let server;
 let baseUrl;

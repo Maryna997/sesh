@@ -1,6 +1,9 @@
 import { Op, UniqueConstraintError } from 'sequelize';
 import { sequelize } from '../db/index.js';
-import { FavoriteSpot, SurfSpot, SurferProfile } from '../models/index.js';
+import { FavoriteSpot, SurfSpot, SurferAvailability, SurferProfile } from '../models/index.js';
+import { currentlyAvailableWhere } from '../models/SurferAvailability.js';
+import { clock } from '../utils/clock.js';
+import { toPublicAvailability } from '../utils/discovery.js';
 import { missingRequiredFields, validateProfileInput } from '../utils/profileValidation.js';
 import { toPublicSpot } from './surfSpot.controller.js';
 
@@ -131,5 +134,18 @@ export async function getPublicProfile(req, res) {
   if (!profile) {
     return res.status(404).json({ status: 'error', message: 'Surfer profile not found.' });
   }
-  return res.status(200).json({ profile: toPublicProfile(profile) });
+
+  // The surfer's current availability, by the same "currently available"
+  // rule as Discover (not Off, not expired); null otherwise, so an Off or
+  // expired status is never shown as current.
+  const now = clock.now();
+  const availability = await SurferAvailability.findOne({
+    where: { userId, ...currentlyAvailableWhere(now) },
+    attributes: ['userId', 'status', 'arrivalType', 'arrivalAt', 'windowStartsAt', 'windowEndsAt'],
+    include: [{ model: SurfSpot, as: 'spot', required: false, attributes: ['id', 'name', 'area'] }],
+  });
+
+  return res.status(200).json({
+    profile: { ...toPublicProfile(profile), availability: availability ? toPublicAvailability(availability) : null },
+  });
 }

@@ -30,12 +30,24 @@ import { ArrowLeft } from 'lucide-react'
 //
 // `image` is the page's photo in the intro column (each page has its own in
 // Figma); it is decorative, so it has no alternative text.
-function AuthPageLayout({ pageName, heading, description, image, centerOnTablet = false, children }) {
+//
+// `backTo` / `backLabel` change where the back arrow leads (default: the home
+// page); the surfer profile uses them to go back to Discover.
+function AuthPageLayout({
+  pageName,
+  heading,
+  description,
+  image,
+  centerOnTablet = false,
+  backTo = '/',
+  backLabel = 'Back to home page',
+  children,
+}) {
   return (
     <>
       <Link
-        to="/"
-        aria-label="Back to home page"
+        to={backTo}
+        aria-label={backLabel}
         className="-mt-2 -ml-2 mb-4 flex size-11 items-center justify-center rounded-lg text-ink hover:bg-card focus-visible:outline-2 focus-visible:outline-blue md:mb-2"
       >
         <ArrowLeft size={24} aria-hidden="true" />

@@ -7,8 +7,12 @@ import { Circle, Mail, Search, Settings, User } from 'lucide-react'
 // Short labels for the horizontal top navigation (tablet and desktop).
 // The fourth item, "My profile", opens the account menu below (Figma
 // "My profile / Account menu open" frames).
+// `sectionPaths`: other pages that belong to the item's section, so the item
+// stays highlighted there (a surfer profile opened from Discover).
+const DISCOVER_SECTION = ['/surfers/']
+
 export const topNavItems = [
-  { to: '/discover', label: 'Discover' },
+  { to: '/discover', label: 'Discover', sectionPaths: DISCOVER_SECTION },
   { to: '/status', label: 'Status' },
   { to: '/messages', label: 'Messages' },
 ]
@@ -22,7 +26,7 @@ export const accountMenuItems = [
 // Fuller list for the mobile burger menu. Icons are lucide-react components
 // chosen to match the symbols used in the Figma menu.
 export const menuNavItems = [
-  { to: '/discover', label: 'Discover', icon: Search },
+  { to: '/discover', label: 'Discover', icon: Search, sectionPaths: DISCOVER_SECTION },
   { to: '/status', label: 'My Status', icon: Circle, iconProps: { size: 12, fill: 'currentColor' } },
   { to: '/messages', label: 'Messages', icon: Mail },
   { to: '/profile', label: 'My Profile', icon: User },

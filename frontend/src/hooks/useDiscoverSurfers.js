@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDiscoverSurfers } from '../api/discover'
-import { getRequestErrorMessage, SESSION_ENDED_MESSAGE } from '../api/errorMessages'
+import { describeProtectedRequestError } from '../api/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { buildDiscoverQuery } from '../utils/discoverFilters'
-
-export const PROFILE_REQUIRED_MESSAGE = 'Finish your surfer profile to use Discover.'
 
 // Adds the surfers that aren't in the list yet (by userId), keeping order.
 // A surfer can move between pages while someone is browsing (offset
@@ -52,16 +50,9 @@ export function useDiscoverSurfers(filters) {
   // automatically, so this can't loop.
   const errorMessage = useCallback(
     (error) => {
-      const status = error?.kind === 'http' ? error.status : null
-      if (status === 401) {
-        refreshSession()
-        return SESSION_ENDED_MESSAGE
-      }
-      if (status === 403 && error.code === 'PROFILE_REQUIRED') {
-        refreshSession()
-        return PROFILE_REQUIRED_MESSAGE
-      }
-      return getRequestErrorMessage(error)
+      const { message, recheckSession } = describeProtectedRequestError(error)
+      if (recheckSession) refreshSession()
+      return message
     },
     [refreshSession],
   )

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { NavLink } from 'react-router'
+import SectionNavLink from './SectionNavLink'
 import { LoaderCircle, LogOut, X } from 'lucide-react'
 import { menuNavItems } from '../../config/navigation'
 import { trapTabKey } from '../../utils/trapFocus'
@@ -76,8 +76,9 @@ function MobileMenu({ onClose }) {
           <ul className="flex flex-col gap-[19px]">
             {menuNavItems.map((item) => (
               <li key={item.to}>
-                <NavLink
+                <SectionNavLink
                   to={item.to}
+                  sectionPaths={item.sectionPaths}
                   onClick={onClose}
                   className={({ isActive }) =>
                     [
@@ -91,7 +92,7 @@ function MobileMenu({ onClose }) {
                     <item.icon size={18} {...item.iconProps} />
                   </span>
                   {item.label}
-                </NavLink>
+                </SectionNavLink>
               </li>
             ))}
 

@@ -126,6 +126,19 @@ function toPublicArrival(row) {
   return null;
 }
 
+// The public part of a current availability row (with its spot loaded):
+// status, spot and approximate arrival. Never the expiry, the chosen offset
+// or window hour, or any timestamps of the row itself. Used by Discover cards
+// and by the public surfer profile, so both always show the same thing.
+export function toPublicAvailability(row) {
+  return {
+    status: API_STATUS[row.status],
+    // A spot's area tells apart spots with the same name (e.g. two "Praia do Cabedelo")
+    spot: row.spot ? { id: row.spot.id, name: row.spot.name, area: row.spot.area } : null,
+    arrival: toPublicArrival(row),
+  };
+}
+
 // One Discover card from an availability row with its profile and spot
 export function toDiscoverCard(row) {
   return {
@@ -133,11 +146,6 @@ export function toDiscoverCard(row) {
     displayName: row.profile.displayName,
     avatarUrl: row.profile.avatarUrl,
     skillLevel: row.profile.skillLevel,
-    availability: {
-      status: API_STATUS[row.status],
-      // A spot's area tells apart spots with the same name (e.g. two "Praia do Cabedelo")
-      spot: row.spot ? { id: row.spot.id, name: row.spot.name, area: row.spot.area } : null,
-      arrival: toPublicArrival(row),
-    },
+    availability: toPublicAvailability(row),
   };
 }

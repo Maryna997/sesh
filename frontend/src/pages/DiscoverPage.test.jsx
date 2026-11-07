@@ -8,7 +8,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { jsonResponse, renderApp, responses } from '../test/utils'
 import { NO_MATCHES_TITLE, NO_SURFERS_TITLE } from '../components/discover/DiscoverResults'
-import { PROFILE_REQUIRED_MESSAGE } from '../hooks/useDiscoverSurfers'
+import { PROFILE_REQUIRED_MESSAGE } from '../api/errorMessages'
 
 const CARCAVELOS = { id: 'pt-cascais-carcavelos', name: 'Carcavelos', kind: 'beach', area: 'Carcavelos', municipality: 'Cascais', region: 'Lisbon', country: 'Portugal' }
 const GUINCHO = { id: 'pt-cascais-guincho', name: 'Guincho', kind: 'beach', area: 'Cascais', municipality: 'Cascais', region: 'Lisbon', country: 'Portugal' }

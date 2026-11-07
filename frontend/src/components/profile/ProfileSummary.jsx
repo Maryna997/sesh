@@ -22,8 +22,8 @@ function Row({ icon, label, children }) {
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <dt className="inline">{label}: </dt>
-        <dd className="inline break-words">{children}</dd>
+        {/* The label and its colon are semibold; the value stays regular */}
+        <dt className="inline font-semibold">{label}:</dt> <dd className="inline break-words">{children}</dd>
       </div>
     </div>
   )
@@ -31,8 +31,18 @@ function Row({ icon, label, children }) {
 
 const Empty = ({ children }) => <span className="text-muted">{children}</span>
 
-function ProfileSummary({ profile }) {
-  const spotNames = (profile.favoriteSpots ?? []).map((spot) => spot.name)
+// Also used read-only on another surfer's public profile, with three optional
+// settings (the defaults are My Profile's):
+// - `formatSpot(spot)`: how a favorite spot is written (default: its name)
+// - `emptySpotsText`: the placeholder when there are no favorite spots
+// - `aboutLabel`: the label of the bio row ("About" for another surfer)
+function ProfileSummary({
+  profile,
+  formatSpot = (spot) => spot.name,
+  emptySpotsText = 'No favorite spots added',
+  aboutLabel = 'About me',
+}) {
+  const spotNames = (profile.favoriteSpots ?? []).map(formatSpot)
 
   return (
     <dl className="flex flex-col gap-2.5" aria-label="Profile details">
@@ -43,9 +53,9 @@ function ProfileSummary({ profile }) {
         {profile.boardType ? labelOf(SURFBOARD_OPTIONS, profile.boardType) : <Empty>Not specified</Empty>}
       </Row>
       <Row icon={<Crosshair size={17} strokeWidth={1.5} className="text-teal" />} label="Favorite spots">
-        {spotNames.length > 0 ? spotNames.join(', ') : <Empty>No favorite spots added</Empty>}
+        {spotNames.length > 0 ? spotNames.join(', ') : <Empty>{emptySpotsText}</Empty>}
       </Row>
-      <Row icon={<PencilLine size={16} strokeWidth={1.5} className="text-teal" />} label="About me">
+      <Row icon={<PencilLine size={16} strokeWidth={1.5} className="text-teal" />} label={aboutLabel}>
         {profile.about ? <span className="whitespace-pre-line">{profile.about}</span> : <Empty>No bio added yet</Empty>}
       </Row>
     </dl>

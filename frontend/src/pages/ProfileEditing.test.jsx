@@ -80,6 +80,16 @@ describe('View mode', () => {
     expect(editForm()).toBeNull()
   })
 
+  test('row labels (with their colon) are semibold; values stay regular', async () => {
+    await openProfile()
+    for (const label of ['Surf level', 'Board', 'Favorite spots', 'About me']) {
+      const dt = within(details()).getByText(`${label}:`, { selector: 'dt' })
+      expect(dt.className).toContain('font-semibold')
+      expect(dt.nextElementSibling.tagName).toBe('DD')
+      expect(dt.nextElementSibling.className).not.toMatch(/font-(semibold|bold)/)
+    }
+  })
+
   test('empty optional fields show friendly placeholders', async () => {
     await openProfile({ profile: EMPTY_OPTIONALS })
     expect(row('Board')).toBe('Board: Not specified')

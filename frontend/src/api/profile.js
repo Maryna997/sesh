@@ -25,6 +25,13 @@ export function removeAvatar() {
   return apiRequest('/profile/me/avatar', { method: 'DELETE' })
 }
 
+// GET /api/v1/profiles/:userId -> { profile } with another surfer's public
+// fields and current `availability` (null when Off, expired or never set).
+// 404 when there is no such surfer. Needs a signed-in user with a profile.
+export function getPublicProfile(userId) {
+  return apiRequest(`/profiles/${encodeURIComponent(userId)}`)
+}
+
 // GET /api/v1/surf-spots -> { spots }, sorted by name. Public.
 export function getSurfSpots() {
   return apiRequest('/surf-spots')

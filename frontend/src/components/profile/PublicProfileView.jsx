@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import Alert from '../ui/Alert'
 import Avatar from '../ui/Avatar'
 import Button from '../ui/Button'
 import StatusBadge from '../ui/StatusBadge'
@@ -6,6 +7,7 @@ import ProfileSummary from './ProfileSummary'
 import { AVAILABILITY } from '../../config/availability'
 import { formatArrival } from '../../utils/discoverCard'
 import { spotNameWithArea } from '../../utils/publicProfile'
+import { useStartConversation } from '../../hooks/useStartConversation'
 
 // Another surfer's public profile, read-only, laid out like My Profile's
 // panel so both pages look the same:
@@ -54,7 +56,7 @@ function AvailabilitySummary({ availability }) {
 
 function PublicProfileView({ profile }) {
   const baseId = useId()
-  const noteId = `${baseId}-message-note`
+  const message = useStartConversation()
 
   return (
     <>
@@ -79,14 +81,16 @@ function PublicProfileView({ profile }) {
           aboutLabel="About"
         />
 
-        {/* Where My Profile has "Edit profile". Placeholder until messaging
-            exists: disabled, no handler, with the reason shown. */}
-        <Button fullWidth className="mt-10" disabled aria-describedby={noteId}>
+        {/* Where My Profile has "Edit profile": opens the conversation with
+            this surfer (created or reused, see useStartConversation). */}
+        <Button fullWidth className="mt-10" loading={message.pending} onClick={() => message.start(profile.userId)}>
           Message
         </Button>
-        <p id={noteId} className="mt-2 text-center text-[11px] text-muted">
-          Messaging coming soon
-        </p>
+        {message.error && (
+          <Alert className="mt-3" title="We couldn’t open the conversation">
+            {message.error}
+          </Alert>
+        )}
         <Button variant="text" size="sm" to="/discover" className="mt-3 w-full">
           Back to Discover
         </Button>

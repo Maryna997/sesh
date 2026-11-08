@@ -327,20 +327,16 @@ describe('privacy and read-only', () => {
   })
 })
 
-describe('Message button (placeholder)', () => {
-  test('visible, disabled, explained, and does nothing', async () => {
-    const user = userEvent.setup()
-    const fetchMock = await openProfile()
+describe('Message button', () => {
+  // What it does (conversation request, navigation, errors) is tested in
+  // StartConversation.test.jsx
+  test('enabled, without the former “coming soon” note', async () => {
+    await openProfile()
     await surferHeading()
     const button = screen.getByRole('button', { name: 'Message' })
-    expect(button.disabled).toBe(true)
-    const note = document.getElementById(button.getAttribute('aria-describedby'))
-    expect(note.textContent).toBe('Messaging coming soon')
-
-    const callsBefore = fetchMock.mock.calls.length
-    await user.click(button)
-    expect(location()).toBe(`/surfers/${MARIANA_ID}`)
-    expect(fetchMock.mock.calls).toHaveLength(callsBefore)
+    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-describedby')).toBeNull()
+    expect(screen.queryByText('Messaging coming soon')).toBeNull()
   })
 })
 

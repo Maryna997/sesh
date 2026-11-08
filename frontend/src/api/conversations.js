@@ -14,6 +14,15 @@ export function getConversations({ page = 1, limit } = {}) {
   return apiRequest(query ? `/conversations?${query}` : '/conversations')
 }
 
+// POST /api/v1/conversations { recipientUserId } -> { conversation }
+// Starts the conversation with another surfer, or returns the existing one
+// (201 created / 200 existing; the frontend treats both the same).
+// conversation: { id, otherParticipant, createdAt }. The other participant is
+// the only id sent; the sender always comes from the session.
+export function startConversation(recipientUserId) {
+  return apiRequest('/conversations', { method: 'POST', body: { recipientUserId } })
+}
+
 // GET /api/v1/conversations/:id/messages -> { messages, pagination }
 // - no cursor: the latest messages, newest first; pagination has nextCursor
 //   (older messages, or null) and pollCursor (newest message, or null when

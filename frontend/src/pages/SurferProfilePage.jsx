@@ -61,7 +61,8 @@ function SurferProfilePage() {
         />
       )}
 
-      {status === 'ready' && profile && <PublicProfileView profile={profile} />}
+      {/* key: another surfer gets a fresh view, so a pending Message request of the previous one is dropped */}
+      {status === 'ready' && profile && <PublicProfileView key={profile.userId} profile={profile} />}
     </AuthPageLayout>
   )
 }

@@ -227,27 +227,33 @@ describe('Load more', () => {
 })
 
 describe('navigation', () => {
-  test('a row opens /messages/:conversationId (keyboard), a placeholder that loads nothing', async () => {
+  test('a row opens the conversation at /messages/:conversationId (keyboard)', async () => {
     const user = userEvent.setup()
     const target = conversation('Mariana Silva')
-    const fetchMock = await openInbox({ conversations: () => page([target]) })
+    const fetchMock = await openInbox({
+      conversations: () => page([target]),
+      extra: { [`/api/v1/conversations/${target.id}/messages`]: () => jsonResponse(200, { messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } }) },
+    })
     await list()
     const row = rows()[0]
     expect(row.getAttribute('href')).toBe(`/messages/${target.id}`)
     expect(row.querySelectorAll('a, button')).toHaveLength(0) // no nested controls
+    expect(conversationCalls(fetchMock)).toEqual(['/api/v1/conversations']) // the inbox loads no message history
 
     row.focus()
     await user.keyboard('{Enter}')
     expect(location()).toBe(`/messages/${target.id}`)
-    expect(await screen.findByRole('heading', { name: 'Conversation' })).toBeTruthy()
-    expect(screen.getByText('This page is coming soon.')).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mariana Silva' })).toBeTruthy()
     expect(screen.getAllByRole('link', { name: 'Back to Messages' }).every((link) => link.getAttribute('href') === '/messages')).toBe(true)
-    expect(conversationCalls(fetchMock)).toEqual(['/api/v1/conversations']) // no message history requested
+    expect(conversationCalls(fetchMock)).toContain(`/api/v1/conversations/${target.id}/messages?limit=30`)
   })
 
   test.each(['/messages', '/messages/0c0c0c0c-0000-4000-8000-000000000999'])('Messages is the active navigation item on %s', async (path) => {
     const user = userEvent.setup()
-    mockBackend({ conversations: () => page([]) })
+    mockBackend({
+      conversations: () => page([]),
+      extra: { [`${path.replace('/messages', '/api/v1/conversations')}/messages`]: () => jsonResponse(200, { messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } }) },
+    })
     renderApp(path)
     await screen.findByRole('heading', { level: 1 })
     const topNav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'Main' })

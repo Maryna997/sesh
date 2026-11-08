@@ -60,7 +60,7 @@ function App() {
               <Route path="status" element={<StatusPage />} />
               {/* Another surfer's public profile (read-only), opened from Discover */}
               <Route path="surfers/:userId" element={<SurferProfilePage />} />
-              {/* Inbox, and one conversation (placeholder until Task 9.4) */}
+              {/* Inbox, and one conversation (chat with polling) */}
               <Route path="messages" element={<MessagesPage />} />
               <Route path="messages/:conversationId" element={<ConversationPage />} />
             </Route>

@@ -30,6 +30,9 @@
   --color-card: #ebf6f8;
   --color-border: #c9e0e5;
 
+  /* Chat: my own message bubbles (Figma "Chat / Conversation" frames) */
+  --color-bubble-sent: #cbeaf2;
+
   /* Destructive actions (Settings / Delete Account frame) */
   --color-danger: #b84542;
   --color-danger-soft: #fcf2f0;

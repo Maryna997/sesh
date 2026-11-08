@@ -33,6 +33,9 @@ import { ArrowLeft } from 'lucide-react'
 //
 // `backTo` / `backLabel` change where the back arrow leads (default: the home
 // page); the surfer profile uses them to go back to Discover.
+//
+// Without `heading`, the panel shows only `children`, which then provide the
+// page's <h1> themselves (the chat's contact header, as in Figma).
 function AuthPageLayout({
   pageName,
   heading,
@@ -71,9 +74,15 @@ function AuthPageLayout({
         </div>
 
         <section className={`md:rounded-[20px] md:bg-white md:p-8 lg:self-center ${centerOnTablet ? 'md:self-center' : ''}`}>
-          <h1 className="text-[26px] font-bold text-ink">{heading}</h1>
-          <p className="mt-3 text-[13px] text-muted">{description}</p>
-          <div className="mt-8">{children}</div>
+          {heading ? (
+            <>
+              <h1 className="text-[26px] font-bold text-ink">{heading}</h1>
+              <p className="mt-3 text-[13px] text-muted">{description}</p>
+              <div className="mt-8">{children}</div>
+            </>
+          ) : (
+            children
+          )}
         </section>
       </div>
     </>

@@ -51,7 +51,8 @@ describe('session restoration', () => {
 
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('heading', { name: 'Messages' })).toBeTruthy()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // Two session checks (the inbox then loads its own data, not counted here)
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/auth/me')).toHaveLength(2)
   })
 
   test('a server error during the check is also shown as a failed check', async () => {

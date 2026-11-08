@@ -13,6 +13,7 @@ import CreateProfilePage from './pages/CreateProfilePage'
 import DiscoverPage from './pages/DiscoverPage'
 import StatusPage from './pages/StatusPage'
 import MessagesPage from './pages/MessagesPage'
+import ConversationPage from './pages/ConversationPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import SurferProfilePage from './pages/SurferProfilePage'
@@ -28,7 +29,7 @@ const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/M
 // the sign-in state. The landing page (/) is full-width; every other page
 // is wrapped in PageLayout, which adds the standard page padding (compact
 // under the header for /login, /register, /create-profile, /discover, /profile,
-// /status and /surfers/:userId).
+// /status, /surfers/:userId and /messages).
 //
 // - Public: /, the 404 page and the dev pages.
 // - PublicOnlyRoute: /login and /register (signed-in users are sent on).
@@ -52,13 +53,16 @@ function App() {
             <Route element={<OnboardingRoute />}>
               <Route path="create-profile" element={<CreateProfilePage />} />
             </Route>
-            {/* Discover, My Profile, My Status and surfer profiles use the same two-column layout (Figma) */}
+            {/* Discover, My Profile, My Status, surfer profiles and Messages use the same two-column layout (Figma) */}
             <Route element={<RequireCompletedProfile />}>
               <Route path="discover" element={<DiscoverPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="status" element={<StatusPage />} />
               {/* Another surfer's public profile (read-only), opened from Discover */}
               <Route path="surfers/:userId" element={<SurferProfilePage />} />
+              {/* Inbox, and one conversation (placeholder until Task 9.4) */}
+              <Route path="messages" element={<MessagesPage />} />
+              <Route path="messages/:conversationId" element={<ConversationPage />} />
             </Route>
           </Route>
         </Route>
@@ -67,7 +71,6 @@ function App() {
 
           <Route element={<RequireAuth />}>
             <Route element={<RequireCompletedProfile />}>
-              <Route path="messages" element={<MessagesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Route>

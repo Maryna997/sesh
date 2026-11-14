@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getConversations, getMessages, sendMessage } from '../api/conversations'
+import { getMessages, sendMessage } from '../api/conversations'
 import { describeProtectedRequestError } from '../api/errorMessages'
 import { useAuth } from '../auth/useAuth'
 
@@ -11,12 +11,9 @@ export const CONVERSATION_GONE_MESSAGE = 'This conversation is no longer availab
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// The participant is looked up in the conversation list (the history
-// endpoint has no participant details): 50 per page, at most 20 pages.
-const PARTICIPANT_PAGE_SIZE = 50
-const PARTICIPANT_MAX_PAGES = 20
-
 const isNotFound = (error) => error?.kind === 'http' && error.status === 404
+// The other surfer deleted their account: the conversation is read-only
+const isInactive = (error) => error?.kind === 'http' && error.status === 409 && error.code === 'CONVERSATION_INACTIVE'
 const asList = (value) => (Array.isArray(value) ? value : [])
 
 // Adds the messages that aren't in the list yet (by id), keeping the order
@@ -31,19 +28,6 @@ function prependNew(current, older) {
   const ids = new Set(current.map((message) => message.id))
   const added = older.filter((message) => message?.id && !ids.has(message.id) && ids.add(message.id))
   return added.length > 0 ? [...added, ...current] : current
-}
-
-// The other participant ({ userId, displayName, avatarUrl }) of one of my
-// conversations, or null when it isn't in my list
-async function findParticipant(conversationId) {
-  const wanted = conversationId.toLowerCase()
-  for (let page = 1; page <= PARTICIPANT_MAX_PAGES; page += 1) {
-    const data = await getConversations({ page, limit: PARTICIPANT_PAGE_SIZE })
-    const match = asList(data.conversations).find((conversation) => conversation?.id?.toLowerCase() === wanted)
-    if (match) return match.otherParticipant ?? null
-    if (!data.pagination || page >= data.pagination.totalPages) return null
-  }
-  return null
 }
 
 // One conversation: history, sending and polling. The page renders it with
@@ -67,10 +51,17 @@ async function findParticipant(conversationId) {
 // asks for the latest messages (the backend's documented way), then switches
 // to the cursor.
 //
+// Who the other surfer is comes from the history response's `conversation`
+// ({ id, isActive, otherParticipant }). isActive false means they deleted
+// their account: the history stays readable, nothing is polled or sent
+// (polling.stopped 'inactive'). Polling answers carry the same field, so a
+// conversation that becomes inactive while open stops too; a 409
+// CONVERSATION_INACTIVE when sending does the same.
+//
 // Returns { status: 'loading' | 'ready' | 'not-found' | 'error', error,
-//   participant, messages, hasOlder, older: { status, error }, loadOlder,
+//   isActive, participant, messages, hasOlder, older: { status, error }, loadOlder,
 //   send(text) -> Promise<boolean>, sending, sendError,
-//   polling: { problem, stopped: null | 'gone' | 'session', message },
+//   polling: { problem, stopped: null | 'gone' | 'session' | 'inactive', message },
 //   announcement, retry }.
 export function useChat(conversationId, { currentUserId, onBeforePrepend } = {}) {
   const { refreshSession } = useAuth()
@@ -128,21 +119,24 @@ export function useChat(conversationId, { currentUserId, onBeforePrepend } = {})
     if (!validId) return
     const loadId = ++loadIdRef.current
     const isLatest = () => aliveRef.current && loadId === loadIdRef.current
-    Promise.allSettled([getMessages(conversationId), findParticipant(conversationId)]).then(([history, participant]) => {
-      if (!isLatest()) return
-      const failure = history.status === 'rejected' ? history.reason : participant.status === 'rejected' ? participant.reason : null
-      if (failure) {
+    getMessages(conversationId).then(
+      (history) => {
+        if (!isLatest()) return
+        const pagination = history.pagination ?? {}
+        const isActive = history.conversation?.isActive !== false
+        pollCursorRef.current = pagination.pollCursor ?? null
+        setConfirmed(appendNew([], [...asList(history.messages)].reverse())) // newest first → oldest first
+        setSent([])
+        setOlder({ cursor: pagination.hasMore ? (pagination.nextCursor ?? null) : null, status: 'idle', error: null })
+        setPolling({ problem: false, stopped: isActive ? null : 'inactive', message: null })
+        setLoad({ attempt, status: 'ready', error: null, isActive, participant: isActive ? (history.conversation?.otherParticipant ?? null) : null })
+      },
+      (failure) => {
+        if (!isLatest()) return
         if (isNotFound(failure)) return setLoad({ attempt, status: 'not-found', error: null, participant: null })
-        return setLoad({ attempt, status: 'error', error: errorMessage(failure).message, participant: null })
-      }
-      const pagination = history.value.pagination ?? {}
-      pollCursorRef.current = pagination.pollCursor ?? null
-      setConfirmed(appendNew([], [...asList(history.value.messages)].reverse())) // newest first → oldest first
-      setSent([])
-      setOlder({ cursor: pagination.hasMore ? (pagination.nextCursor ?? null) : null, status: 'idle', error: null })
-      setPolling({ problem: false, stopped: null, message: null })
-      setLoad({ attempt, status: 'ready', error: null, participant: participant.value })
-    })
+        setLoad({ attempt, status: 'error', error: errorMessage(failure).message, participant: null })
+      },
+    )
   }, [conversationId, validId, attempt, errorMessage])
 
   const status = !validId ? 'not-found' : load.attempt === attempt ? load.status : 'loading'
@@ -191,6 +185,12 @@ export function useChat(conversationId, { currentUserId, onBeforePrepend } = {})
           }
         }
         setPolling((current) => (current.problem ? { ...current, problem: false } : current))
+        // The other surfer deleted their account meanwhile: stop (read-only now)
+        if (data.conversation?.isActive === false) {
+          cancelled = true
+          setPolling({ problem: false, stopped: 'inactive', message: null })
+          return
+        }
       } catch (error) {
         if (cancelled) return
         if (isNotFound(error)) {
@@ -269,6 +269,12 @@ export function useChat(conversationId, { currentUserId, onBeforePrepend } = {})
       } catch (error) {
         if (!aliveRef.current) return false
         let message
+        if (isInactive(error)) {
+          // Expected state, not an error: the page shows "no longer active"
+          setPolling({ problem: false, stopped: 'inactive', message: null })
+          setSendState({ status: 'idle', error: null })
+          return false
+        }
         if (isNotFound(error)) {
           message = CONVERSATION_GONE_MESSAGE
           setPolling({ problem: false, stopped: 'gone', message })
@@ -298,6 +304,8 @@ export function useChat(conversationId, { currentUserId, onBeforePrepend } = {})
   return {
     status,
     error: status === 'error' ? load.error : null,
+    // false once the other surfer deleted their account (from the server)
+    isActive: isReady ? load.isActive !== false && polling.stopped !== 'inactive' : true,
     participant: isReady ? load.participant : null,
     messages: isReady ? messages : [],
     hasOlder: isReady && Boolean(older.cursor),

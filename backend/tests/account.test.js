@@ -239,7 +239,7 @@ const favoriteCount = (userId) =>
   sequelize.query('SELECT count(*)::int AS n FROM surfer_favorite_spots WHERE user_id = $1', { bind: [userId] }).then(([[row]]) => row.n);
 
 describe('DELETE /api/v1/account', () => {
-  test('deletes the account and everything that belongs to it; other accounts keep their data', async () => {
+  test('deletes the account and its personal data; shared conversations stay for the other surfer, anonymised', async () => {
     const remove = mock.method(avatarStorage, 'remove', async () => {});
     const user = await richUser('del-ok');
     const friend = await richUser('del-friend');
@@ -254,14 +254,23 @@ describe('DELETE /api/v1/account', () => {
     assert.match(sessionSetCookie(response), /sesh_session=;/); // cookie cleared
     assert.equal(remove.mock.callCount(), 0); // no profile picture
 
-    // Gone: account, sessions, profile, favorite spots, availability, the shared conversation and its messages
+    // Gone: account, sessions, profile, favorite spots, availability
     assert.equal(await User.count({ where: { id: user.id } }), 0);
     assert.equal(await Session.count({ where: { userId: user.id } }), 0);
     assert.equal(await SurferProfile.count({ where: { userId: user.id } }), 0);
     assert.equal(await favoriteCount(user.id), 0);
     assert.equal(await SurferAvailability.count({ where: { userId: user.id } }), 0);
-    assert.equal(await Conversation.count({ where: { id: shared } }), 0);
-    assert.equal(await Message.count({ where: { conversationId: shared } }), 0); // the friend's reply too
+    // Kept: the shared conversation and both messages, without the deleted id anywhere
+    const kept = await Conversation.findByPk(shared);
+    assert.deepEqual([kept.userOneId, kept.userTwoId].filter(Boolean), [friend.id]);
+    const messages = await Message.findAll({ where: { conversationId: shared }, order: [['createdAt', 'ASC']] });
+    assert.deepEqual(messages.map((m) => [m.body, m.senderId]), [['Surf at 4?', null], ['Yes!', friend.id]]);
+    const [[mentions]] = await sequelize.query(
+      `SELECT (SELECT count(*) FROM conversations WHERE user_one_id = $1 OR user_two_id = $1)
+            + (SELECT count(*) FROM messages WHERE sender_id = $1) AS n`,
+      { bind: [user.id] },
+    );
+    assert.equal(Number(mentions.n), 0);
 
     // Kept: the other accounts, their profiles, spots, availability and their own conversation
     for (const other of [friend, bystander]) {

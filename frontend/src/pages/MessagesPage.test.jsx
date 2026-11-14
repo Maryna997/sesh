@@ -119,6 +119,24 @@ describe('inbox rendering', () => {
     await list()
     expect(names()).toEqual(['Sesh surfer'])
   })
+
+  test('a conversation with a deleted account: “Deleted account”, neutral avatar, last message and time kept, still opens', async () => {
+    const retained = conversation('ignored', {
+      isActive: false,
+      otherParticipant: null,
+      lastMessage: { id: 'm1', senderId: null, preview: 'See you at Carcavelos', createdAt: '2026-11-08T10:24:00.000Z' },
+    })
+    await openInbox({ conversations: () => page([conversation('Lucas Costa', { isActive: true }), retained]) })
+    await list()
+    expect(names()).toEqual(['Lucas Costa', 'Deleted account'])
+    const row = rows()[1]
+    expect(row.textContent).toContain('See you at Carcavelos')
+    expect(row.textContent).not.toContain('You:')
+    expect(row.querySelector('time').getAttribute('datetime')).toBe('2026-11-08T10:24:00.000Z')
+    expect(row.querySelector('img')).toBeNull()
+    expect(row.textContent).not.toMatch(/\bDA\b/) // no initials for a deleted account
+    expect(row.getAttribute('href')).toBe(`/messages/${retained.id}`)
+  })
 })
 
 describe('API integration and states', () => {
@@ -232,7 +250,7 @@ describe('navigation', () => {
     const target = conversation('Mariana Silva')
     const fetchMock = await openInbox({
       conversations: () => page([target]),
-      extra: { [`/api/v1/conversations/${target.id}/messages`]: () => jsonResponse(200, { messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } }) },
+      extra: { [`/api/v1/conversations/${target.id}/messages`]: () => jsonResponse(200, { conversation: { id: target.id, isActive: true, otherParticipant: target.otherParticipant }, messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } }) },
     })
     await list()
     const row = rows()[0]
@@ -305,5 +323,46 @@ describe('session and profile', () => {
     })
     renderApp('/messages')
     await waitFor(() => expect(location()).toBe('/create-profile'))
+  })
+})
+
+describe('retained conversation with a deleted account (regression)', () => {
+  test('opening it, going back and reloading the inbox keep it: read-only history, header not a link', async () => {
+    const user = userEvent.setup()
+    const retained = conversation('ignored', {
+      isActive: false,
+      otherParticipant: null,
+      lastMessage: { id: 'm2', senderId: null, preview: 'See you there', createdAt: '2026-11-08T10:24:00.000Z' },
+    })
+    const fetchMock = await openInbox({
+      conversations: () => page([retained]),
+      extra: {
+        [`/api/v1/conversations/${retained.id}/messages`]: () =>
+          jsonResponse(200, {
+            conversation: { id: retained.id, isActive: false, otherParticipant: null },
+            messages: [
+              { id: 'm2', conversationId: retained.id, senderId: null, body: 'See you there', createdAt: '2026-11-08T10:24:00.000Z' },
+              { id: 'm1', conversationId: retained.id, senderId: TEST_USER.id, body: 'Surf at 4?', createdAt: '2026-11-08T10:20:00.000Z' },
+            ],
+            pagination: { hasMore: false, nextCursor: null, pollCursor: 'cursor-m2' },
+          }),
+      },
+    })
+    await list()
+    expect(names()).toEqual(['Deleted account'])
+
+    await user.click(rows()[0])
+    expect(await screen.findByRole('heading', { level: 1, name: 'Deleted account' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Deleted account/ })).toBeNull()
+    const history = within(screen.getByRole('list', { name: 'Messages' }))
+    expect(history.getAllByRole('listitem').map((item) => item.querySelector('p').textContent)).toEqual(['Surf at 4?', 'See you there'])
+    expect(screen.getByText('This conversation is no longer active.')).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
+
+    await user.click(screen.getByRole('link', { name: 'Back to Messages' }))
+    await list()
+    expect(names()).toEqual(['Deleted account'])
+    expect(rows()[0].textContent).toContain('See you there')
+    expect(conversationCalls(fetchMock).filter((url) => url === '/api/v1/conversations')).toHaveLength(2) // reloaded, still there
   })
 })

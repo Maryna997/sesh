@@ -77,8 +77,14 @@ function mockBackend({ start = (body) => conversationResponse(body.recipientUser
       }))
       return jsonResponse(200, { conversations: items, pagination: { page: 1, limit: 50, total: 2, totalPages: 1 } })
     }
-    if (/^\/api\/v1\/conversations\/[^/]+\/messages$/.test(pathname)) {
-      return jsonResponse(200, { messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } })
+    const chat = pathname.match(/^\/api\/v1\/conversations\/([^/]+)\/messages$/)
+    if (chat) {
+      const userId = chat[1] === LUCAS_CONVERSATION_ID ? LUCAS_ID : MARIANA_ID
+      return jsonResponse(200, {
+        conversation: { id: chat[1], isActive: true, otherParticipant: PARTICIPANTS[userId] },
+        messages: [],
+        pagination: { hasMore: false, nextCursor: null, pollCursor: null },
+      })
     }
     throw new Error(`Unexpected request in test: ${method} ${url}`)
   })

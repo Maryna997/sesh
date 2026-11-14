@@ -68,8 +68,19 @@ function mockBackend({
   history = () => latestPage([]),
   send = () => error(500),
   conversations = () => conversationsPage([summary(ID, MARIANA), summary(OTHER_ID, LUCAS)]),
+  // The other participant per conversation, as the history endpoint reports
+  // it in `conversation` (null = deleted account, the conversation is inactive)
+  participants = { [ID]: MARIANA, [OTHER_ID]: LUCAS },
   me = () => responses.signedIn(),
 } = {}) {
+  // Adds the backend's `conversation` field to history answers that don't set it
+  const withConversation = async (response, id) => {
+    if (!response?.ok) return response
+    const body = await response.clone().json()
+    if (body.conversation) return response
+    const otherParticipant = participants[id] ?? null
+    return jsonResponse(response.status, { conversation: { id, isActive: otherParticipant !== null, otherParticipant }, ...body })
+  }
   const fetchMock = vi.fn(async (url, options = {}) => {
     const { pathname, searchParams } = new URL(url, 'http://localhost')
     const params = Object.fromEntries(searchParams)
@@ -77,8 +88,8 @@ function mockBackend({
     if (pathname === '/api/v1/conversations') return conversations(params)
     const match = pathname.match(/^\/api\/v1\/conversations\/([^/]+)\/messages$/)
     if (match && (options.method ?? 'GET') === 'GET') {
-      if (params.after) return (await history(params, match[1])) ?? newerPage([], params.after)
-      return history(params, match[1])
+      if (params.after) return withConversation((await history(params, match[1])) ?? newerPage([], params.after), match[1])
+      return withConversation(await history(params, match[1]), match[1])
     }
     if (match && options.method === 'POST') return send(JSON.parse(options.body), match[1])
     throw new Error(`Unexpected request in test: ${options.method ?? 'GET'} ${url}`)
@@ -170,17 +181,18 @@ describe('chat rendering', () => {
     expect(screen.getByRole('main').textContent).not.toContain(ID)
     expect(screen.getByRole('link', { name: 'Back to Messages' }).getAttribute('href')).toBe('/messages')
 
-    // Latest messages (limit 30) and the participant lookup, with the session cookie
+    // Latest messages (limit 30) with the session cookie; the participant comes
+    // from that answer (no conversation-list lookup)
     expect(historyCalls(fetchMock)).toEqual(['limit=30'])
     const urls = fetchMock.mock.calls.map(([url]) => url)
-    expect(urls).toContain('/api/v1/conversations?limit=50')
+    expect(urls.some((url) => url.startsWith('/api/v1/conversations?'))).toBe(false)
     expect(fetchMock.mock.calls.every(([, options]) => options.credentials === 'include')).toBe(true)
   })
 
   test('the photo is shown when there is one; a missing participant falls back to “Sesh surfer”', async () => {
     await openChat({
       history: () => latestPage([message()]),
-      conversations: () => conversationsPage([summary(ID, { ...MARIANA, avatarUrl: 'https://cdn.example/mariana.jpg' })]),
+      participants: { [ID]: { ...MARIANA, avatarUrl: 'https://cdn.example/mariana.jpg' } },
     })
     await messageList()
     const photos = document.querySelectorAll('img[src="https://cdn.example/mariana.jpg"]')
@@ -188,8 +200,8 @@ describe('chat rendering', () => {
     expect([...photos].every((photo) => photo.getAttribute('alt') === '')).toBe(true) // name is right next to it
   })
 
-  test('participant not in the list: “Sesh surfer”', async () => {
-    await openChat({ history: () => latestPage([message()]), conversations: () => conversationsPage([]) })
+  test('participant without a display name: “Sesh surfer”', async () => {
+    await openChat({ history: () => latestPage([message()]), participants: { [ID]: { ...MARIANA, displayName: null } } })
     expect(await screen.findByRole('heading', { level: 1, name: 'Sesh surfer' })).toBeTruthy()
   })
 
@@ -812,5 +824,97 @@ describe('polling', () => {
     await wait(5000)
     await waitFor(() => expect(historyCalls(fetchMock)).toHaveLength(4))
     expect(historyCalls(fetchMock)[3]).toBe(`after=${cursorOf(first)}&limit=30`)
+  })
+})
+
+// ---------- Header link and deleted accounts (Task 10 refinements) ----------
+
+describe('contact header', () => {
+  test('active surfer: the whole header is one link to their public profile (mouse and keyboard)', async () => {
+    const user = setupUser()
+    await openChat({ history: () => latestPage([message()]) })
+    await messageList()
+    const header = screen.getByRole('link', { name: /Mariana Silva/ })
+    expect(header.getAttribute('href')).toBe(`/surfers/${MARIANA.userId}`)
+    expect(header.querySelector('a, button')).toBeNull() // nothing nested
+    expect(within(header).getByRole('heading', { level: 1, name: 'Mariana Silva' })).toBeTruthy()
+    expect(header.className).toContain('hover:bg-pale')
+    expect(header.className).toContain('focus-visible:outline-2')
+
+    header.focus()
+    await user.keyboard('{Enter}')
+    expect(location()).toBe(`/surfers/${MARIANA.userId}`)
+  })
+})
+
+describe('the other surfer deleted their account', () => {
+  const deleted = { [ID]: null }
+
+  test('read-only history: “Deleted account” header (not a link), neutral avatars, info instead of the composer, no polling', async () => {
+    const history = [message({ body: 'Surf at 4?', senderId: null }), mine({ body: 'Yes!' }), message({ body: 'See you', senderId: null })]
+    const { fetchMock } = await openChat({ history: () => latestPage(history), participants: deleted })
+    await messageList()
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Deleted account' })).toBeTruthy()
+    expect(screen.getByText('This surfer is no longer on Sesh.')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Deleted account/ })).toBeNull()
+    expect(screen.getByRole('main').querySelector('a[href^="/surfers/"]')).toBeNull()
+
+    expect(texts()).toEqual(['Surf at 4?', 'Yes!', 'See you'])
+    const [first, mineBubble] = bubbles()
+    expect(first.textContent).toContain('Deleted account:')
+    expect(first.querySelector('img')).toBeNull()
+    expect(first.querySelector('svg')).toBeTruthy() // neutral placeholder icon
+    expect(mineBubble.className).toContain('justify-end')
+
+    expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
+    expect(screen.getByText('This conversation is no longer active.')).toBeTruthy()
+    expect(screen.getByText('You can still read previous messages, but you can’t send new ones.')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull() // an expected state, not an error
+
+    await wait(30_000)
+    expect(historyCalls(fetchMock)).toEqual(['limit=30']) // no polling
+  })
+
+  test('older messages can still be loaded', async () => {
+    const user = setupUser()
+    const recent = [message({ senderId: null, body: 'Recent' })]
+    await openChat({
+      participants: deleted,
+      history: (params) => (params.before ? olderPage([message({ senderId: null, body: 'Older' })]) : latestPage(recent, { hasMore: true })),
+    })
+    await messageList()
+    await user.click(screen.getByRole('button', { name: 'Load earlier messages' }))
+    await waitFor(() => expect(texts()).toEqual(['Older', 'Recent']))
+  })
+
+  test('deleted while the chat is open: the next poll switches to the read-only state and polling stops', async () => {
+    const participants = { [ID]: MARIANA }
+    const { fetchMock } = await openChat({ history: (params) => (params.after ? newerPage([], params.after) : latestPage([message({ body: 'Hi' })])), participants })
+    await messageList()
+    expect(field()).toBeTruthy()
+
+    participants[ID] = null
+    await wait(5000)
+    expect(await screen.findByText('This conversation is no longer active.')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Deleted account' })).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
+    await wait(30_000)
+    expect(historyCalls(fetchMock)).toHaveLength(2)
+  })
+
+  test('sending into a conversation that became inactive (409): read-only state, no error, nothing added', async () => {
+    const user = setupUser()
+    await openChat({
+      history: () => latestPage([message({ body: 'Hi' })]),
+      send: () => error(409, { code: 'CONVERSATION_INACTIVE', message: 'This conversation is no longer active.' }),
+    })
+    await messageList()
+    await user.click(field())
+    await user.keyboard('Still there?{Enter}')
+    expect(await screen.findByText('This conversation is no longer active.')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Deleted account' })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(texts()).toEqual(['Hi'])
   })
 })

@@ -97,7 +97,8 @@ describe('POST /api/v1/conversations', { skip }, () => {
     const [a, b] = [await surfer('Ana'), await surfer('Bea')];
     const created = await start(a, b.id);
     assert.equal(created.status, 201);
-    assert.deepEqual(Object.keys(created.body.conversation).sort(), ['createdAt', 'id', 'otherParticipant']);
+    assert.deepEqual(Object.keys(created.body.conversation).sort(), ['createdAt', 'id', 'isActive', 'otherParticipant']);
+    assert.equal(created.body.conversation.isActive, true);
     assert.deepEqual(created.body.conversation.otherParticipant, { userId: b.id, displayName: 'Bea', avatarUrl: null });
 
     const again = await start(a, b.id);
@@ -317,7 +318,12 @@ describe('GET /api/v1/conversations/:id/messages', { skip }, () => {
     const [a, b] = [await surfer(), await surfer()];
     const id = await conversationOf(a, b);
     const response = await messages(b, id);
-    assert.deepEqual(response.body, { messages: [], pagination: { hasMore: false, nextCursor: null, pollCursor: null } });
+    assert.deepEqual(response.body.messages, []);
+    assert.deepEqual(response.body.pagination, { hasMore: false, nextCursor: null, pollCursor: null });
+    // The conversation itself, with the other participant's public identity (Task 10 refinement)
+    assert.equal(response.body.conversation.id, id);
+    assert.equal(response.body.conversation.isActive, true);
+    assert.equal(response.body.conversation.otherParticipant.userId, a.id);
   });
 
   test('before: walks back through older pages without duplicates or gaps (also across equal timestamps)', async () => {
@@ -349,7 +355,9 @@ describe('GET /api/v1/conversations/:id/messages', { skip }, () => {
     let cursor = opened.body.pagination.pollCursor;
 
     const quiet = await messages(a, id, `?after=${cursor}`);
-    assert.deepEqual(quiet.body, { messages: [], pagination: { hasMore: false, nextCursor: cursor } });
+    assert.deepEqual(quiet.body.messages, []);
+    assert.deepEqual(quiet.body.pagination, { hasMore: false, nextCursor: cursor });
+    assert.equal(quiet.body.conversation.isActive, true);
 
     await send(b, id, 'new 1');
     await send(b, id, 'new 2');

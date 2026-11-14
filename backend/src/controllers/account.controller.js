@@ -119,11 +119,18 @@ export async function changePassword(req, res) {
 }
 
 // ---------- DELETE /api/v1/account  { confirmation: "DELETE" } ----------
-// Permanently deletes the account. The user row is deleted in a transaction;
-// the database's ON DELETE CASCADE rules remove everything that belongs to it:
-// sessions, surfer profile, favorite spots, availability, every conversation
-// the user took part in and all messages in those conversations (the other
-// participant's too). Other accounts are untouched.
+// Permanently deletes the account. The user row is deleted in a transaction
+// and the database does the rest:
+// - ON DELETE CASCADE: sessions, surfer profile, favorite spots, availability
+//   (so the surfer disappears from Discover and public profiles at once);
+// - ON DELETE SET NULL (retain-conversations migration): conversations and
+//   messages stay for the other participant, with the deleted person's id
+//   replaced by NULL ("Deleted account"; read-only, no new messages);
+// - conversations where the other surfer had already deleted their account
+//   are removed first (nobody would be left to read them).
+// No email, password hash, picture or profile detail of the deleted person
+// remains; the text of messages they sent does (see the private docs on
+// data retention). Other accounts are untouched.
 //
 // Profile picture (Cloudinary can't join the database transaction): it is
 // deleted FIRST. If that fails, nothing is deleted and the user is asked to
@@ -164,7 +171,17 @@ export async function deleteAccount(req, res) {
     const user = await User.findByPk(userId, { attributes: ['id'], transaction, lock: transaction.LOCK.UPDATE });
     if (!user) return null;
     const current = await SurferProfile.findByPk(userId, { attributes: ['avatarPublicId'], transaction });
-    await user.destroy({ transaction }); // ON DELETE CASCADE does the rest
+    // Conversations whose other participant already deleted their account
+    // would have nobody left to read them: delete them (their messages follow
+    // by cascade). The database CHECK requires at least one participant.
+    await sequelize.query(
+      `DELETE FROM conversations
+        WHERE (user_one_id = $1 AND user_two_id IS NULL) OR (user_two_id = $1 AND user_one_id IS NULL)`,
+      { bind: [userId], transaction },
+    );
+    // Cascades remove sessions, profile, favorite spots and availability;
+    // in the remaining conversations and messages the id becomes NULL
+    await user.destroy({ transaction });
     const latePublicId = current?.avatarPublicId;
     return { latePublicId: latePublicId && latePublicId !== publicId ? latePublicId : null };
   });

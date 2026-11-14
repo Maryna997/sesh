@@ -290,7 +290,10 @@ describe('Delete Account', () => {
     await open('/settings/delete-account')
     expect(screen.getByRole('heading', { level: 2, name: 'Delete your Sesh account?' })).toBeTruthy()
     expect(screen.getByText('This action permanently removes your account and profile and cannot be undone.')).toBeTruthy()
-    expect(screen.getByText('Your messages and profile data will be deleted.')).toBeTruthy()
+    expect(
+      screen.getByText(/^Your account and profile will be permanently deleted\. Existing messages may remain visible to other participants, but\s+they won’t be able to contact you\.$/),
+    ).toBeTruthy()
+    expect(screen.queryByText(/conversations are removed/)).toBeNull()
     expect(document.querySelector('input[type="password"]')).toBeNull()
     expect(deleteButton().disabled).toBe(true)
     expect(deleteButton().className).toContain('bg-danger')

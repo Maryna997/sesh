@@ -23,6 +23,7 @@ import {
 // all get the same 404, so nobody can learn which conversations exist.
 
 const CONVERSATION_NOT_FOUND = { status: 'error', message: 'Conversation not found.' };
+const CONVERSATION_INACTIVE = { status: 'error', code: 'CONVERSATION_INACTIVE', message: 'This conversation is no longer active.' };
 const PROFILE_FIELDS = ['userId', 'displayName', 'avatarUrl'];
 
 // The exact (microsecond) UTC timestamp of a message, for cursors
@@ -33,19 +34,33 @@ function rejectQuery(res, errors) {
   return res.status(400).json({ status: 'error', message: 'Please check the request options.', errors });
 }
 
-// The conversation if the user takes part in it, otherwise null (one indexed lookup)
+// The conversation if the user takes part in it, otherwise null (one indexed
+// lookup): { id, otherUserId } where otherUserId is null when the other
+// participant deleted their account.
 async function findOwnConversation(conversationId, userId) {
   if (typeof conversationId !== 'string' || !UUID_PATTERN.test(conversationId)) return null;
   const [rows] = await sequelize.query(
-    'SELECT id FROM conversations WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)',
+    `SELECT id, CASE WHEN user_one_id = $2 THEN user_two_id ELSE user_one_id END AS other_user_id
+       FROM conversations WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)`,
     { bind: [conversationId.toLowerCase(), userId] },
   );
-  return rows[0] ?? null;
+  return rows[0] ? { id: rows[0].id, otherUserId: rows[0].other_user_id } : null;
+}
+
+// Deleted accounts: the database replaced their id with NULL (see the
+// retain-conversations migration). Such a conversation stays readable for
+// the remaining participant but is inactive: isActive false,
+// otherParticipant null (no id, name or picture of the deleted person).
+async function conversationSummary(conversation) {
+  if (!conversation.otherUserId) return { id: conversation.id, isActive: false, otherParticipant: null };
+  const profile = await SurferProfile.findByPk(conversation.otherUserId, { attributes: PROFILE_FIELDS });
+  return { id: conversation.id, isActive: true, otherParticipant: toParticipantResponse(conversation.otherUserId, profile) };
 }
 
 function toConversationResponse(conversation, otherProfile, otherUserId) {
   return {
     id: conversation.id,
+    isActive: true,
     otherParticipant: toParticipantResponse(otherUserId, otherProfile),
     createdAt: conversation.createdAt.toISOString(),
   };
@@ -132,7 +147,12 @@ export async function listConversations(req, res) {
   return res.status(200).json({
     conversations: rows.map((row) => ({
       id: row.id,
-      otherParticipant: toParticipantResponse(row.other_user_id, { displayName: row.display_name, avatarUrl: row.avatar_url }),
+      // other_user_id is NULL when the other surfer deleted their account
+      isActive: row.other_user_id !== null,
+      otherParticipant:
+        row.other_user_id === null
+          ? null
+          : toParticipantResponse(row.other_user_id, { displayName: row.display_name, avatarUrl: row.avatar_url }),
       createdAt: new Date(row.created_at).toISOString(),
       lastActivityAt: new Date(row.updated_at).toISOString(),
       lastMessage: row.last_id
@@ -194,7 +214,14 @@ export async function getMessages(req, res) {
   else if (mode === 'before') pagination = { hasMore, nextCursor: hasMore ? cursorOf(last) : null };
   else pagination = { hasMore, nextCursor: last ? cursorOf(last) : req.query.after };
 
-  return res.status(200).json({ messages: page.map(toMessageResponse), pagination });
+  // The conversation itself (who the other surfer is, or that they deleted
+  // their account), so the chat page needs no other request and polling
+  // notices when the conversation becomes inactive.
+  return res.status(200).json({
+    conversation: await conversationSummary(conversation),
+    messages: page.map(toMessageResponse),
+    pagination,
+  });
 }
 
 // POST /api/v1/conversations/:conversationId/messages  { body }
@@ -231,10 +258,13 @@ export async function sendMessage(req, res) {
     });
   }
 
+  // Only while both participants still exist: a conversation whose other
+  // surfer deleted their account is read-only (the UPDATE matches nothing).
   const message = await sequelize.transaction(async (transaction) => {
     const [locked] = await sequelize.query(
       `UPDATE conversations SET updated_at = clock_timestamp()
         WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)
+          AND user_one_id IS NOT NULL AND user_two_id IS NOT NULL
         RETURNING id`,
       { bind: [conversationId.toLowerCase(), me], transaction },
     );
@@ -244,7 +274,11 @@ export async function sendMessage(req, res) {
       { transaction },
     );
   });
-  if (!message) return res.status(404).json(CONVERSATION_NOT_FOUND);
+  if (!message) {
+    // Mine but inactive → 409 (the chat shows "no longer active"); otherwise 404
+    if (await findOwnConversation(conversationId, me)) return res.status(409).json(CONVERSATION_INACTIVE);
+    return res.status(404).json(CONVERSATION_NOT_FOUND);
+  }
 
   return res.status(201).json({ message: toMessageResponse(message.get({ plain: true })) });
 }

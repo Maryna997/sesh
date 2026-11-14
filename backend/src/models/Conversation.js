@@ -12,6 +12,12 @@ import { sequelize } from '../db/index.js';
 //
 // Who may read or write a conversation is NOT decided here: the messaging API
 // must check that the signed-in user is one of the two participants.
+//
+// Deleted accounts (retain-conversations migration): the database replaces
+// a deleted participant's id with NULL (ON DELETE SET NULL) and keeps the
+// conversation for the other surfer, read-only. allowNull stays false here
+// on purpose: a NEW conversation always needs two real users; only the
+// database itself sets NULL, and existing rows are read as they are.
 export const Conversation = sequelize.define(
   'Conversation',
   {

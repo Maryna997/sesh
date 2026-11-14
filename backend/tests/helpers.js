@@ -11,7 +11,15 @@ export const TEST_DOMAIN = '@sesh-test.invalid';
 const RUN_ID = Date.now().toString(36);
 export const testEmail = (name) => `${name}-${RUN_ID}${TEST_DOMAIN}`;
 
-export function deleteTestUsers() {
+// Conversations between test users are deleted first: deleting both
+// participants in one statement would leave a conversation without anyone
+// (refused by conversations_participant_present_check), and a conversation
+// kept for one deleted test user would otherwise remain.
+export async function deleteTestUsers() {
+  const testUsers = `SELECT id FROM users WHERE email LIKE '%${TEST_DOMAIN}'`;
+  await User.sequelize.query(
+    `DELETE FROM conversations WHERE user_one_id IN (${testUsers}) OR user_two_id IN (${testUsers})`,
+  );
   return User.destroy({ where: { email: { [Op.like]: `%${TEST_DOMAIN}` } } });
 }
 

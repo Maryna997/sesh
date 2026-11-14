@@ -14,6 +14,11 @@ import { sequelize } from '../db/index.js';
 // That the sender is one of the conversation's participants is NOT checked
 // by the database: the messaging API must take the sender from the session
 // and check participation before creating a message.
+//
+// senderId is NULL for messages whose sender deleted their account (the
+// database sets it, ON DELETE SET NULL; the message stays readable for the
+// other participant). allowNull stays false here: a new message always has
+// a sender.
 export const MESSAGE_MAX_LENGTH = 2000;
 
 // Unicode characters (code points), the same count as PostgreSQL's char_length

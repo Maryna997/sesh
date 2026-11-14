@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { ChevronRight } from 'lucide-react'
 import Avatar from '../ui/Avatar'
+import DeletedAccountAvatar, { DELETED_ACCOUNT_NAME } from './DeletedAccountAvatar'
 import { formatInboxTime } from '../../utils/messageTime'
 
 // One row of the inbox, as in the Figma "Messages / Inbox" frames:
@@ -9,9 +10,12 @@ import { formatInboxTime } from '../../utils/messageTime'
 // The whole row is one link to the conversation (no nested controls).
 // The time is the last message's, or when the conversation was started.
 // Only public fields are shown; ids are used for the link only.
+// isActive false (from the server): the other surfer deleted their account:
+// "Deleted account" with a neutral avatar; the row still opens the history.
 function ConversationItem({ conversation, currentUserId, now }) {
   const { otherParticipant, lastMessage } = conversation
-  const name = otherParticipant?.displayName || 'Sesh surfer'
+  const deleted = conversation.isActive === false
+  const name = deleted ? DELETED_ACCOUNT_NAME : otherParticipant?.displayName || 'Sesh surfer'
   const time = lastMessage?.createdAt ?? conversation.createdAt
   const fromMe = lastMessage && lastMessage.senderId === currentUserId
 
@@ -24,7 +28,7 @@ function ConversationItem({ conversation, currentUserId, now }) {
       ].join(' ')}
     >
       {/* The name is right next to the avatar, so it isn't read twice */}
-      <Avatar src={otherParticipant?.avatarUrl} name={name} decorative />
+      {deleted ? <DeletedAccountAvatar /> : <Avatar src={otherParticipant?.avatarUrl} name={name} decorative />}
 
       <span className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="flex items-baseline justify-between gap-3">

@@ -281,7 +281,8 @@ describe('deletion', { skip }, () => {
     assert.equal(await Message.count({ where: { conversationId: conversation.id } }), 0);
   });
 
-  test('deleting a user deletes their conversations and those messages; the other user stays', async () => {
+  // Since the retain-conversations migration (was: CASCADE, deleting everything)
+  test('deleting a user keeps their conversations and messages, with their id replaced by NULL', async () => {
     const [a, b, c] = [await testUser(), await testUser(), await testUser()];
     const ab = await conversationBetween(a, b);
     const bc = await conversationBetween(b, c);
@@ -290,10 +291,23 @@ describe('deletion', { skip }, () => {
     await Message.create({ conversationId: bc.id, senderId: c.id, body: 'from c' });
 
     await a.destroy();
-    assert.equal(await Conversation.count({ where: { id: ab.id } }), 0);
-    assert.equal(await Message.count({ where: { conversationId: ab.id } }), 0);
+    const kept = await Conversation.findByPk(ab.id);
+    const remaining = [kept.userOneId, kept.userTwoId];
+    assert.ok(remaining.includes(null) && remaining.includes(b.id));
+    assert.ok(!remaining.includes(a.id));
+    const messages = await Message.findAll({ where: { conversationId: ab.id }, order: [['body', 'ASC']] });
+    assert.deepEqual(messages.map((m) => [m.body, m.senderId]), [['from a', null], ['from b', b.id]]);
     assert.ok(await User.findByPk(b.id));
     assert.equal(await Message.count({ where: { conversationId: bc.id } }), 1); // unrelated conversation untouched
+  });
+
+  test('a conversation can’t lose both participants (the account deletion removes it first)', async () => {
+    const [a, b] = [await testUser(), await testUser()];
+    const ab = await conversationBetween(a, b);
+    await a.destroy();
+    assert.equal(await pgCode(b.destroy()), '23514'); // conversations_participant_present_check
+    await ab.destroy();
+    await b.destroy();
   });
 });
 
@@ -305,9 +319,14 @@ describe('schema and existing models', { skip }, () => {
     const byName = Object.fromEntries(constraints.map((row) => [row.conname, row]));
     assert.match(byName.conversations_participants_order_check.definition, /user_one_id < user_two_id/);
     assert.match(byName.messages_body_check.definition, /char_length\(body\) <= 2000/);
-    const foreignKeys = constraints.filter((row) => row.contype === 'f').map((row) => row.definition);
+    assert.match(byName.conversations_participant_present_check.definition, /user_one_id IS NOT NULL\) OR \(user_two_id IS NOT NULL/);
+    const foreignKeys = constraints.filter((row) => row.contype === 'f');
     assert.equal(foreignKeys.length, 4);
-    for (const definition of foreignKeys) assert.match(definition, /ON DELETE CASCADE/);
+    // Users: SET NULL (retain-conversations migration); the conversation's messages: CASCADE
+    for (const name of ['conversations_user_one_id_fkey', 'conversations_user_two_id_fkey', 'messages_sender_id_fkey']) {
+      assert.match(byName[name].definition, /REFERENCES users\(id\).*ON DELETE SET NULL/);
+    }
+    assert.match(byName.messages_conversation_id_fkey.definition, /REFERENCES conversations\(id\).*ON DELETE CASCADE/);
 
     const [indexes] = await sequelize.query(
       "SELECT indexname, indexdef FROM pg_indexes WHERE tablename IN ('conversations', 'messages')",

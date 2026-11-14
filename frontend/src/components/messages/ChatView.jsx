@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
-import { LoaderCircle, MessageCircle, MessageSquareOff } from 'lucide-react'
+import { Info, LoaderCircle, MessageCircle, MessageSquareOff } from 'lucide-react'
 import Alert from '../ui/Alert'
 import Button from '../ui/Button'
 import EmptyState from '../ui/EmptyState'
@@ -11,6 +11,8 @@ import { useChat } from '../../hooks/useChat'
 import { useNow } from '../../hooks/useNow'
 
 export const POLL_PROBLEM_MESSAGE = 'We’re having trouble getting new messages. We’ll keep trying.'
+export const INACTIVE_TITLE = 'This conversation is no longer active.'
+export const INACTIVE_TEXT = 'You can still read previous messages, but you can’t send new ones.'
 
 const NEAR_BOTTOM_PX = 80
 const PREVIEW_LENGTH = 140 // characters of an incoming message read out by screen readers
@@ -18,6 +20,13 @@ const PREVIEW_LENGTH = 140 // characters of an incoming message read out by scre
 // The history scrolls inside the panel, sized to the screen (dvh follows
 // mobile browser bars) with a minimum, so the composer stays in view on
 // phones and the panel doesn't grow past the Figma size on large screens.
+//
+// No overscroll-behavior: contain on purpose. With "contain", a wheel or
+// touchpad gesture over the history went nowhere once the history reached
+// its end (it opens at the bottom), because the page wasn't allowed to take
+// over; on phones the history fills most of the screen, so the page seemed
+// not to scroll at all. The default lets the page scroll at the ends.
+const HISTORY_SCROLL_CLASSES = 'overflow-y-auto rounded-xl py-2 outline-none focus-visible:outline-2 focus-visible:outline-blue'
 const HISTORY_HEIGHT =
   'h-[max(240px,calc(100dvh-380px))] md:h-[max(280px,calc(100dvh-420px))] md:max-h-[520px] lg:h-[max(320px,calc(100dvh-450px))]'
 
@@ -151,7 +160,7 @@ function ChatView({ conversationId }) {
           aria-label="Message history"
           tabIndex={0}
           onScroll={handleScroll}
-          className={`overflow-y-auto overscroll-contain rounded-xl py-2 outline-none focus-visible:outline-2 focus-visible:outline-blue ${HISTORY_HEIGHT}`}
+          className={`${HISTORY_SCROLL_CLASSES} ${HISTORY_HEIGHT}`}
         >
           {hasOlder && (
             <div className="mb-4 flex flex-col items-center gap-3">
@@ -171,7 +180,7 @@ function ChatView({ conversationId }) {
               className="bg-transparent"
               icon={MessageCircle}
               title="No messages yet"
-              description={`Say hi to ${name} and plan your next session.`}
+              description={chat.isActive ? `Say hi to ${name} and plan your next session.` : 'There are no previous messages in this conversation.'}
             />
           ) : (
             <ol aria-label="Messages" className="flex flex-col gap-4 px-0.5">
@@ -199,7 +208,16 @@ function ChatView({ conversationId }) {
               {POLL_PROBLEM_MESSAGE}
             </p>
           )}
-          {polling.stopped ? (
+          {polling.stopped === 'inactive' ? (
+            // An expected state (the other surfer deleted their account), not an error
+            <div role="status" className="flex gap-3 rounded-[10px] border border-border bg-card px-4 py-3 text-[13px] text-ink">
+              <Info size={18} aria-hidden="true" className="mt-px shrink-0 text-teal" />
+              <div>
+                <p className="font-bold">{INACTIVE_TITLE}</p>
+                <p className="mt-1 text-muted">{INACTIVE_TEXT}</p>
+              </div>
+            </div>
+          ) : polling.stopped ? (
             <Alert title={polling.stopped === 'gone' ? 'You can’t send messages here' : 'You’ve been signed out'}>{polling.message}</Alert>
           ) : (
             <MessageComposer onSend={chat.send} sending={chat.sending} error={chat.sendError} />
@@ -211,7 +229,7 @@ function ChatView({ conversationId }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <ChatHeader participant={status === 'ready' ? (participant ?? {}) : null} name={name} />
+      <ChatHeader participant={status === 'ready' ? (participant ?? {}) : null} name={name} deleted={status === 'ready' && !chat.isActive} />
 
       {/* Outside the aria-busy area, so they are not held back */}
       <p role="status" className="sr-only">

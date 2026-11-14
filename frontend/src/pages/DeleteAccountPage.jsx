@@ -81,10 +81,10 @@ function DeleteAccountPage() {
         {/* Static warning (read with the field through aria-describedby), not an alert */}
         <div id={warningId} className="flex gap-3 rounded-[10px] border border-danger-line bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
           <TriangleAlert size={18} aria-hidden="true" className="mt-px shrink-0" />
-          <div className="flex flex-col gap-1">
-            <p className="font-bold">Your messages and profile data will be deleted.</p>
-            <p>Your conversations are removed for the other surfers too.</p>
-          </div>
+          <p>
+            Your account and profile will be permanently deleted. Existing messages may remain visible to other participants, but
+            they won’t be able to contact you.
+          </p>
         </div>
 
         {error && <Alert title="Your account wasn’t deleted">{error}</Alert>}

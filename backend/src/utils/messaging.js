@@ -129,11 +129,12 @@ export function validateSendMessage(requestBody) {
 
 const iso = (value) => (value instanceof Date ? value : new Date(value)).toISOString();
 
+// senderId is null when the sender deleted their account (never left out)
 export function toMessageResponse(row) {
   return {
     id: row.id,
     conversationId: row.conversation_id ?? row.conversationId,
-    senderId: row.sender_id ?? row.senderId,
+    senderId: (row.sender_id !== undefined ? row.sender_id : row.senderId) ?? null,
     body: row.body,
     createdAt: iso(row.created_at ?? row.createdAt),
   };

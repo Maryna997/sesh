@@ -16,6 +16,9 @@ import MessagesPage from './pages/MessagesPage'
 import ConversationPage from './pages/ConversationPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
+import EmailSettingsPage from './pages/EmailSettingsPage'
+import PasswordSettingsPage from './pages/PasswordSettingsPage'
+import DeleteAccountPage from './pages/DeleteAccountPage'
 import SurferProfilePage from './pages/SurferProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -29,7 +32,7 @@ const MemberHeaderPreviewPage = import.meta.env.DEV ? lazy(() => import('./dev/M
 // the sign-in state. The landing page (/) is full-width; every other page
 // is wrapped in PageLayout, which adds the standard page padding (compact
 // under the header for /login, /register, /create-profile, /discover, /profile,
-// /status, /surfers/:userId and /messages).
+// /status, /surfers/:userId, /messages and /settings).
 //
 // - Public: /, the 404 page and the dev pages.
 // - PublicOnlyRoute: /login and /register (signed-in users are sent on).
@@ -63,17 +66,17 @@ function App() {
               {/* Inbox, and one conversation (chat with polling) */}
               <Route path="messages" element={<MessagesPage />} />
               <Route path="messages/:conversationId" element={<ConversationPage />} />
+              {/* Settings & Privacy and its three account screens */}
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="settings/email" element={<EmailSettingsPage />} />
+              <Route path="settings/password" element={<PasswordSettingsPage />} />
+              <Route path="settings/delete-account" element={<DeleteAccountPage />} />
             </Route>
           </Route>
         </Route>
 
         <Route element={<PageLayout />}>
 
-          <Route element={<RequireAuth />}>
-            <Route element={<RequireCompletedProfile />}>
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-          </Route>
           {UiPreviewPage && (
             <Route
               path="ui-preview"

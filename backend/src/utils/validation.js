@@ -26,6 +26,32 @@ function isMissing(value) {
   return value === undefined || value === null || value === '';
 }
 
+// The registration rules for one email value: { error } or { email } (normalized).
+// Shared by registration and the email change in Settings.
+export function checkEmail(email) {
+  if (isMissing(email)) return { error: 'Email is required.' };
+  if (typeof email !== 'string') return { error: 'Email must be a string.' };
+  const normalized = normalizeEmail(email);
+  if (!normalized) return { error: 'Email is required.' };
+  if (normalized.length > EMAIL_MAX_LENGTH) return { error: `Email must be at most ${EMAIL_MAX_LENGTH} characters.` };
+  if (!EMAIL_PATTERN.test(normalized)) return { error: 'Enter a valid email address, like you@example.com.' };
+  return { email: normalized };
+}
+
+// The registration rules for a new password: an error message, or undefined.
+// Shared by registration and the password change in Settings.
+// The password is NOT trimmed: spaces are valid password characters.
+export function checkNewPassword(password) {
+  if (isMissing(password)) return 'Password is required.';
+  if (typeof password !== 'string') return 'Password must be a string.';
+  // [...password] counts characters (an emoji is one), like the frontend does
+  if ([...password].length < PASSWORD_MIN_LENGTH) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+  if (Buffer.byteLength(normalizePassword(password), 'utf8') > PASSWORD_MAX_BYTES) {
+    return `Password is too long. Use at most ${PASSWORD_MAX_BYTES} bytes (about ${PASSWORD_MAX_BYTES} standard characters; emoji and accented letters use more).`;
+  }
+  return undefined;
+}
+
 // Checks the registration body.
 // Returns { errors } (an object of field -> message) when something is wrong,
 // or { data: { email, password } } with the normalized email when it's valid.
@@ -36,34 +62,13 @@ export function validateRegistration(body) {
 
   const { email, password } = body;
   const errors = {};
-  let normalizedEmail;
 
-  if (isMissing(email)) {
-    errors.email = 'Email is required.';
-  } else if (typeof email !== 'string') {
-    errors.email = 'Email must be a string.';
-  } else {
-    normalizedEmail = normalizeEmail(email);
-    if (!normalizedEmail) {
-      errors.email = 'Email is required.';
-    } else if (normalizedEmail.length > EMAIL_MAX_LENGTH) {
-      errors.email = `Email must be at most ${EMAIL_MAX_LENGTH} characters.`;
-    } else if (!EMAIL_PATTERN.test(normalizedEmail)) {
-      errors.email = 'Enter a valid email address, like you@example.com.';
-    }
-  }
+  const emailCheck = checkEmail(email);
+  if (emailCheck.error) errors.email = emailCheck.error;
+  const normalizedEmail = emailCheck.email;
 
-  // The password is NOT trimmed: spaces are valid password characters.
-  if (isMissing(password)) {
-    errors.password = 'Password is required.';
-  } else if (typeof password !== 'string') {
-    errors.password = 'Password must be a string.';
-  } else if ([...password].length < PASSWORD_MIN_LENGTH) {
-    // [...password] counts characters (an emoji is one), like the frontend does
-    errors.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
-  } else if (Buffer.byteLength(normalizePassword(password), 'utf8') > PASSWORD_MAX_BYTES) {
-    errors.password = `Password is too long. Use at most ${PASSWORD_MAX_BYTES} bytes (about ${PASSWORD_MAX_BYTES} standard characters; emoji and accented letters use more).`;
-  }
+  const passwordError = checkNewPassword(password);
+  if (passwordError) errors.password = passwordError;
 
   if (Object.keys(errors).length > 0) {
     return { errors };

@@ -90,6 +90,14 @@ function AuthProvider({ children }) {
     setState({ status: AUTH_STATUS.UNAUTHENTICATED, user: null, hasCompletedProfile: false, error: null, loggedOut: true })
   }, [])
 
+  // The server already ended the session (the account was deleted and its
+  // cookie cleared): show the user as signed out without another request.
+  // Like logout, protected pages then send the user to the home page.
+  const endSession = useCallback(() => {
+    latestCheck.current++
+    setState({ status: AUTH_STATUS.UNAUTHENTICATED, user: null, hasCompletedProfile: false, error: null, loggedOut: true })
+  }, [])
+
   const value = useMemo(
     () => ({
       ...state,
@@ -98,8 +106,9 @@ function AuthProvider({ children }) {
       refreshSession,
       login,
       logout,
+      endSession,
     }),
-    [state, checkSession, refreshSession, login, logout],
+    [state, checkSession, refreshSession, login, logout, endSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

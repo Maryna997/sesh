@@ -9,6 +9,9 @@ import { fieldBaseClasses, fieldBorderClass, getDescriptionIds } from './fieldSt
 //   (e.g. the search icon in the Figma "Surf spot" field).
 // - `trailing` is an optional small element (usually an icon button) shown
 //   at the end of the field, e.g. PasswordInput's show/hide toggle.
+// - `readOnly` shows the value on the muted page background (e.g. the current
+//   email in Settings), so it doesn't look like something to type into
+//   ("!" makes these colours win over the field's white background and ink text).
 // All other props (type, name, value, onChange, placeholder...) go to <input>.
 function Input({
   label,
@@ -18,6 +21,7 @@ function Input({
   required = false,
   icon: Icon,
   trailing,
+  readOnly = false,
   className = '',
   ...rest
 }) {
@@ -46,7 +50,8 @@ function Input({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={getDescriptionIds(inputId, { helperText, error })}
-          className={`${fieldBaseClasses} ${fieldBorderClass(error)} ${Icon ? 'pl-11' : ''} ${trailing ? 'pr-12' : ''}`}
+          readOnly={readOnly}
+          className={`${fieldBaseClasses} ${fieldBorderClass(error)} ${Icon ? 'pl-11' : ''} ${trailing ? 'pr-12' : ''} ${readOnly ? 'bg-bg! text-muted!' : ''}`}
           {...rest}
         />
         {trailing && <div className="absolute top-1/2 right-1.5 -translate-y-1/2">{trailing}</div>}

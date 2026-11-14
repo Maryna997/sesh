@@ -12,8 +12,24 @@ const { name: COOKIE_NAME, options: COOKIE_OPTIONS } = authConfig.cookie;
 const SESSION_LIFETIME_MS = authConfig.jwt.expiresInSeconds * 1000;
 
 // The only user fields ever sent to the client
-function toPublicUser(user) {
+export function toPublicUser(user) {
   return { id: user.id, email: user.email, createdAt: user.createdAt };
+}
+
+// Creates a session row and returns its signed token (used by login and by
+// the password change, which replaces the current session).
+export async function createSessionToken(userId, { transaction } = {}) {
+  const session = await Session.create({ userId, expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS) }, { transaction });
+  return signSessionToken({ userId, sessionId: session.id });
+}
+
+// Sets the session cookie (HttpOnly; the token is never in a response body)
+export function setSessionCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, { ...COOKIE_OPTIONS, maxAge: SESSION_LIFETIME_MS });
+}
+
+export function clearSessionCookie(res) {
+  res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
 }
 
 // POST /api/v1/auth/register
@@ -80,13 +96,8 @@ export async function login(req, res) {
   // Tidy up this user's expired sessions while we're here
   await Session.destroy({ where: { userId: user.id, expiresAt: { [Op.lte]: new Date() } } });
 
-  const session = await Session.create({
-    userId: user.id,
-    expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS),
-  });
-  const token = signSessionToken({ userId: user.id, sessionId: session.id });
-
-  res.cookie(COOKIE_NAME, token, { ...COOKIE_OPTIONS, maxAge: SESSION_LIFETIME_MS });
+  const token = await createSessionToken(user.id);
+  setSessionCookie(res, token);
   return res.status(200).json({ user: toPublicUser(user) });
 }
 
@@ -102,7 +113,7 @@ export async function logout(req, res) {
     await Session.destroy({ where: { id: claims.sessionId, userId: claims.userId } });
   }
 
-  res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+  clearSessionCookie(res);
   return res.status(200).json({ status: 'ok', message: 'Logged out.' });
 }
 

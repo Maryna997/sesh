@@ -77,7 +77,7 @@ function AuthPageLayout({
           {heading ? (
             <>
               <h1 className="text-[26px] font-bold text-ink">{heading}</h1>
-              <p className="mt-3 text-[13px] text-muted">{description}</p>
+              {description && <p className="mt-3 text-[13px] text-muted">{description}</p>}
               <div className="mt-8">{children}</div>
             </>
           ) : (

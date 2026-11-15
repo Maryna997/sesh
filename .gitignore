@@ -16,6 +16,11 @@ node_modules/
 dist/
 coverage/
 
+# Playwright (E2E) reports, traces and screenshots
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+
 # Logs
 *.log
 npm-debug.log*

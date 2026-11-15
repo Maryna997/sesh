@@ -1,0 +1,13 @@
+{
+  "name": "sesh-e2e",
+  "private": true,
+  "description": "Browser end-to-end tests for Sesh (Playwright): real frontend, real backend, disposable PostgreSQL database",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}

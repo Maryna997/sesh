@@ -103,3 +103,76 @@ jobs:
 
       - name: Tests (Node test runner, real PostgreSQL 17)
         run: npm test
+
+  e2e:
+    name: End-to-end (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # Its own throwaway PostgreSQL 17; the E2E suite migrates it and empties
+    # it at the start of the run (e2e/support/global-setup.js). The suite
+    # refuses any database that isn't local or whose name lacks "e2e".
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sesh_e2e
+          POSTGRES_PASSWORD: sesh_e2e_password
+          POSTGRES_DB: sesh_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sesh_e2e -d sesh_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    # Playwright starts the real backend (against this database, with a
+    # throwaway JWT secret and Cloudinary disabled) and the real frontend.
+    env:
+      E2E_DATABASE_URL: postgres://sesh_e2e:sesh_e2e_password@localhost:5432/sesh_e2e
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install backend dependencies (from the lockfile)
+        run: npm ci
+        working-directory: backend
+
+      - name: Install frontend dependencies (from the lockfile)
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install E2E dependencies (from the lockfile)
+        run: npm ci
+        working-directory: e2e
+
+      - name: Install the Playwright Chromium browser
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      - name: End-to-end tests
+        run: npm test
+        working-directory: e2e
+
+      # Traces, screenshots and the HTML report, only when something failed
+      - name: Upload Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7

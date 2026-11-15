@@ -1,0 +1,105 @@
+# Continuous integration for Sesh: checks every push to main and every pull
+# request targeting main. Two independent jobs (frontend, backend); any failed
+# step fails its job and the workflow. CI only: nothing is deployed from here
+# (Vercel and Render deploy separately).
+name: Sesh CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only access to the repository is all the jobs need
+permissions:
+  contents: read
+
+# A newer push to the same pull request replaces its older, still-running check
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  frontend:
+    name: Frontend (lint, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies (from the lockfile)
+        run: npm ci
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Tests (Vitest, API mocked)
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+  backend:
+    name: Backend (migrations, tests on PostgreSQL 17)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+
+    # A throwaway PostgreSQL 17 (the Supabase version) that exists only for
+    # this job; its credentials are test-only values, not secrets.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sesh_ci
+          POSTGRES_PASSWORD: sesh_ci_password
+          POSTGRES_DB: sesh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sesh_ci -d sesh_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    # Only the CI database is configured: DATABASE_URL is not set, so neither
+    # the migrations nor the tests can reach Supabase. tests/setup.js supplies
+    # the remaining test values (throwaway JWT secret, CLIENT_URL, low bcrypt
+    # cost, dummy Cloudinary values; Cloudinary itself is mocked in the tests).
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgres://sesh_ci:sesh_ci_password@localhost:5432/sesh_test
+      TEST_DATABASE_SSL: 'false'
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies (from the lockfile)
+        run: npm ci
+
+      - name: Apply all Sequelize migrations to the CI database
+        run: npm run db:migrate:test
+
+      - name: Tests (Node test runner, real PostgreSQL 17)
+        run: npm test

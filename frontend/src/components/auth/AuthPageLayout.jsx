@@ -73,7 +73,10 @@ function AuthPageLayout({
           <p className="mt-5 text-xs text-muted">No live GPS required · Status-based matching</p>
         </div>
 
-        <section className={`md:rounded-[20px] md:bg-white md:p-8 lg:self-center ${centerOnTablet ? 'md:self-center' : ''}`}>
+        {/* min-w-0: on mobile the grid has one automatic column, and a grid
+            item's default min-width (its widest unbreakable content, e.g. a
+            truncated name or message preview) would otherwise widen the page */}
+        <section className={`min-w-0 md:rounded-[20px] md:bg-white md:p-8 lg:self-center ${centerOnTablet ? 'md:self-center' : ''}`}>
           {heading ? (
             <>
               <h1 className="text-[26px] font-bold text-ink">{heading}</h1>

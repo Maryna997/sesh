@@ -4,9 +4,9 @@
 // Clients only ever get a short, generic message: never stack traces, SQL,
 // connection details or request data.
 //
-// Express recognises an error handler by its four parameters, so `next`
+// Express recognises an error handler by its four parameters, so `_next`
 // must stay in the signature even though it isn't used.
-export function errorHandler(error, req, res, next) {
+export function errorHandler(error, req, res, _next) {
   // Body that isn't valid JSON, e.g. {"email": }
   if (error.type === 'entity.parse.failed') {
     return res.status(400).json({ status: 'error', message: 'Request body must be valid JSON.' });

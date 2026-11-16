@@ -233,10 +233,18 @@ describe('relationships on delete', () => {
     await SurferAvailability.create({ userId: user.id, ...VALID.atSpot });
     const transaction = await sequelize.transaction();
     try {
-      await assert.rejects(
-        SurfSpot.destroy({ where: { id: CARCAVELOS }, transaction }),
-        { name: 'SequelizeForeignKeyConstraintError' },
-      );
+      // Rejected by the availability foreign key (ON DELETE RESTRICT). The
+      // SQLSTATE depends on the PostgreSQL version: up to 17 a RESTRICT
+      // violation is reported as foreign_key_violation (23503, which
+      // Sequelize turns into SequelizeForeignKeyConstraintError); from 18 as
+      // restrict_violation (23001, a generic SequelizeDatabaseError). Both
+      // mean the same thing, so the test checks the code and the constraint.
+      await assert.rejects(SurfSpot.destroy({ where: { id: CARCAVELOS }, transaction }), (error) => {
+        const { code, constraint } = error.parent ?? {};
+        assert.ok(['23503', '23001'].includes(code), `expected a foreign key RESTRICT violation, got ${code} (${error.name})`);
+        assert.equal(constraint, 'surfer_availability_spot_id_fkey');
+        return true;
+      });
     } finally {
       await transaction.rollback();
     }

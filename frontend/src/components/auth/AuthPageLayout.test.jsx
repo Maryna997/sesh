@@ -24,6 +24,15 @@ describe('AuthPageLayout columns', () => {
     expect([...classes].some((name) => /^grid-cols-/.test(name))).toBe(false)
   })
 
+  // Task 13 regression: without min-w-0 the panel (a grid item) grew to its
+  // widest unbreakable content — a long name or message preview — and the
+  // Messages inbox and chat scrolled sideways on phones (checked in a browser)
+  test('mobile: the panel may shrink below its content, so long text never widens the page', () => {
+    renderLayout()
+    const panel = screen.getByRole('heading', { level: 1, name: 'Welcome back' }).closest('section')
+    expect(panel.classList).toContain('min-w-0')
+  })
+
   test('tablet: intro column next to the 390px Figma panel', () => {
     expect(renderLayout()).toContain('md:grid-cols-[minmax(0,1fr)_390px]')
   })

@@ -351,7 +351,6 @@ test('parseDiscoverQuery (unit)', () => {
   assert.ok(parseDiscoverQuery({ limit: ['10', '20'] }).errors.limit);
 });
 
-// ---------------------------------------------------------------- Task 8.2
 // Filters. NOW is 10:00 UTC = 11:00 Lisbon (summer). Windows start on
 // Lisbon hours: 13:00 Lisbon = 12:00 UTC, 17:00 Lisbon = 16:00 UTC.
 

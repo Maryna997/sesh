@@ -26,7 +26,6 @@ app.use(
 // Block data-changing requests from other websites (CSRF protection)
 app.use(requireTrustedOrigin);
 
-// Parse JSON request bodies
 app.use(express.json());
 
 // API routes

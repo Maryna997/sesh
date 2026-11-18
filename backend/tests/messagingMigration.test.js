@@ -19,6 +19,7 @@ import { sequelize } from '../src/db/index.js';
 const require = createRequire(import.meta.url);
 const migration = require('../src/db/migrations/20261107120000-create-conversations-and-messages.cjs');
 const retainMigration = require('../src/db/migrations/20261114120000-retain-conversations-after-account-deletion.cjs');
+const rlsMigration = require('../src/db/migrations/20261118120000-enable-row-level-security.cjs');
 
 const exists = async (table) => {
   const [[row]] = await sequelize.query('SELECT to_regclass(:table) IS NOT NULL AS present', { replacements: { table: `public.${table}` } });
@@ -74,6 +75,7 @@ describe('messaging migration', { skip }, () => {
     assert.deepEqual(await counts(), before);
     await retainMigration.up(queryInterface, Sequelize);
     assert.equal(await deleteRules(), 'SET NULL,SET NULL,SET NULL');
+    await rlsMigration.up(queryInterface, Sequelize);
   });
 });
 

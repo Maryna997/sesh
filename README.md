@@ -26,6 +26,7 @@ Built around spontaneity and flexibility, Sesh allows surfers to decide when and
 | Backend | Node.js, Express, Sequelize, JWT (HttpOnly cookies) |
 | Database | PostgreSQL, hosted on Supabase |
 | Deployment | Vercel (frontend) and Render (backend) |
+| Media storage | Cloudinary |
 | Testing | Vitest, React Testing Library, Playwright, GitHub Actions |
 
 ## Getting started
@@ -34,6 +35,7 @@ Built around spontaneity and flexibility, Sesh allows surfers to decide when and
 
 - [Node.js](https://nodejs.org/) 20.19+ or 22.12+
 - A [Supabase](https://supabase.com/) project (PostgreSQL)
+- A [Cloudinary](https://cloudinary.com/) account for profile picture uploads
 
 ### Install
 
@@ -45,21 +47,21 @@ cd backend && npm install && cp .env.example .env
 cd ../frontend && npm install
 ```
 
-On Windows Command Prompt, use `copy .env.example .env`.
+On Windows Command Prompt, use `copy .env.example .env` instead of `cp`.
 
 ### Configure
 
 Fill in `backend/.env`. All configuration options are described in `backend/.env.example`.
 
-| Variable | Value |
+| Variable | Description |
 | --- | --- |
-| `PORT` | `5000` |
+| `PORT` | Backend server port, e.g. `5000` |
 | `CLIENT_URL` | Frontend URL, e.g. `http://localhost:5173` |
-| `DATABASE_URL` | Supabase session pooler connection string (port 5432) |
-| `JWT_SECRET` | A long, randomly generated secret |
-| CLOUDINARY_CLOUD_NAME | Cloudinary cloud name |
-| CLOUDINARY_API_KEY | Cloudinary API key |
-| CLOUDINARY_API_SECRET | Cloudinary API secret |
+| `DATABASE_URL` | Supabase PostgreSQL session pooler connection string (port 5432) |
+| `JWT_SECRET` | Long, randomly generated secret used for authentication |
+| `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Your Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
 
 Generate a JWT secret using:
 
@@ -71,7 +73,7 @@ The frontend does not require its own `.env` file for the default local setup. I
 
 To use a different backend address, see `frontend/.env.example`.
 
-Never commit `.env` files or real credentials.
+**Never commit `.env` files, database passwords, JWT secrets or Cloudinary credentials to GitHub.**
 
 ### Set up the database
 
@@ -176,5 +178,4 @@ Automated checks also run through GitHub Actions.
 
 Sesh is an independently developed Software Engineering capstone project with the potential for further development into a production application.
 
-The source code is publicly available for viewing and educational reference. No license is granted to copy, modify, redistribute, or commercially use the code without prior written permission from the copyright holder.
-Third-party libraries, fonts and other assets used by Sesh remain subject to their own licenses and terms.
+The source code is publicly available for viewing and educational reference. No license is granted to copy, modify, redistribute, or commercially use the code without prior written permission from the copyright holder. Third-party libraries, fonts and other assets used by Sesh remain subject to their own licenses and terms.
